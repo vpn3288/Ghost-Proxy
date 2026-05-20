@@ -1,5 +1,19 @@
 # Ghost-Proxy 审核记录
 
+# v6.32 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.32.sh`、`install_transit_v6.32.sh`、`install_amneziawg_dkms_v6.32.sh`，并同步稳定入口 `install_amneziawg_dkms.sh` 到 v6.32。
+- ✅ 修复落地机 `awg-landing.service`：改为 `ExecStartPre=awg-quick up` + 前台存活监视，超时和意外断开明确退出，避免 v6.31 的异常重启状态。
+- ✅ 修复落地机健康检查：主轨端口使用安装时展开的固定值，`systemctl restart` 增加失败保护，避免健康检查服务因单次重启失败退出。
+- ✅ 精简落地机基础依赖：删除 `wireguard-tools` 和无条件 `golang-go`；`golang-go` 仅在 DKMS 失败并回退 `amneziawg-go` 时按需安装。
+- ✅ DNS 锁死改为可选：默认只禁用 IPv6（sysctl + ip6tables），只有显式 `LOCK_DNS=1` 才写入并锁定 `/etc/resolv.conf`，降低与 Docker、1Panel、证书申请和系统更新冲突。
+- ✅ DKMS 脚本补齐 `pkg-config`、`libmnl-dev` 依赖和 `--help/-h` 用法输出，适配干净 Debian 12 上编译 `amneziawg-tools`。
+- ✅ 落地机加固：MTU 探测增加上限保护；SS 备轨端口占用检测改为 TCP+UDP；家宽检测补充 `100.64.0.0/10` CGNAT；Clash 健康检查 URL 改为 HTTPS；删除虚假“流量时序随机化”提示。
+- ✅ 中转机加固：`add_landing()` 内部补齐 IP 和端口校验；端口占用检测统一检查 TCP+UDP；`LANDING_LIST` 帮助增加完整示例和简写示例。
+- ✅ 已执行 `bash -n`：`install_landing_v6.32.sh`、`install_transit_v6.32.sh`、`install_amneziawg_dkms_v6.32.sh`、`install_amneziawg_dkms.sh` 均通过。
+
 ## v6.31 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
