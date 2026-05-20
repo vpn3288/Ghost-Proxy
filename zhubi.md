@@ -9,6 +9,7 @@
 - ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.62.sh`、`install_transit_v6.62.sh`、`install_amneziawg_dkms_v6.62.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
 - ✅ v6.62 实机复测：x86 落地、ARM 落地、中转机重跑安装均成功；三台 `verify_installation.sh` 均 0 失败 0 警告；`systemctl --failed` 均 0；x86 `networking.service` 重启后为 active。
 - ✅ 暴露面复测：中转 8389/8390 可达，落地直连 8389 不可达；中转/落地 AWG UDP 随机探测均无响应；错误输入测试不会停止既有服务。
+- ✅ 卸载复测：ARM 落地机执行完全卸载后服务停止、配置目录删除；随后从清理状态重装 v6.62 成功，验证 0 失败 0 警告，中转双落地配置保持可用。
 
 # v6.61 版本 (2026-05-20)
 
