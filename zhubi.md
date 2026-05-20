@@ -1,5 +1,18 @@
 # Ghost-Proxy 审核记录
 
+## v6.29 / v6.28 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.28.sh`：修复重复 `VERSION` 覆盖，实际运行版本统一为 v6.28。
+- ✅ 落地机删除内置 DKMS 编译逻辑，改为薄调用独立脚本 `/root/install_amneziawg_dkms.sh`（可用 `AWG_DKMS_SCRIPT` 覆盖）。
+- ✅ 落地机保留 `awg-quick` 与 Jc/Jmin/Jmax/S1/S2/H1-H4 混淆参数，删除过长导入说明，只保留终端 YAML 与 Base64 字符串。
+- ✅ 落地机输出中转机新命令：`ghost-transit-ctl add-landing <IP> <名称> --awg-listen ... --awg-target ... --ss-listen ... --ss-target ...`。
+- ✅ 新增 `install_transit_v6.28.sh`：配置结构改为每个落地机独立 `ports[]`，DNAT 使用 `listen -> target`，解决单中转多落地机同端口冲突。
+- ✅ 中转机健康检查读取 `.landings[$i].ports[]?.target` 的 TCP 目标端口，回退 SSH；管理工具 `add-port` 标记为废弃。
+- ✅ 新增 `install_amneziawg_dkms_v6.29.sh` 与稳定入口 `install_amneziawg_dkms.sh`：添加 `/etc/modules` 自动加载；低内存临时 swap 改为 1 小时后清理。
+- ✅ 已执行 `bash -n`：`install_landing_v6.28.sh`、`install_transit_v6.28.sh`、`install_amneziawg_dkms_v6.29.sh`、`install_amneziawg_dkms.sh` 均通过。
+
 ## v6.28 版本 (2026-05-20)
 
 ### 主笔 AI 独立 DKMS 脚本修复
