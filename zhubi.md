@@ -5,6 +5,9 @@
 - ✅ 新增 `install_landing_v6.63.sh`、`install_transit_v6.63.sh`、`install_amneziawg_dkms_v6.63.sh`，并同步稳定入口到 v6.63。
 - ✅ 实机审计修复：`clash-meta-import-block.txt` 和 `clash-meta-subscription.txt` 含客户端私钥与 SS 密码，权限由默认 `644` 收紧为 `600`；保留本地终端复制和文件读取导入方式，不新增 HTTP 订阅。
 - ✅ 低暴露审计：中转机未发现 Nginx/Gost/Xray/Haproxy/sing-box/Caddy/Trojan/V2Ray 进程或包，80/443/8080/8443 未监听；验证 0 失败 0 警告。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.63.sh`、`install_transit_v6.63.sh`、`install_amneziawg_dkms_v6.63.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+- ✅ v6.63 实机复测：x86/ARM 落地机重跑后 `clash-meta-config.yaml`、`clash-meta-subscription.txt`、`clash-meta-import-block.txt` 均为 `600`，Base64 可解码且混淆字段完整；密钥/密码/混淆参数不漂移。
+- ✅ 中转机同步 v6.63 后双落地验证 0 失败 0 警告，`systemctl --failed` 为 0；中转 8389/8390 可达，落地直连 8389 仍不可达。
 
 # v6.62 版本 (2026-05-20)
 
