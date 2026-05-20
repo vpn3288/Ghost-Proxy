@@ -1,5 +1,22 @@
 # Ghost-Proxy 审核记录
 
+# v6.50 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.50.sh`、`install_transit_v6.50.sh`、`install_amneziawg_dkms_v6.50.sh`，并同步稳定入口到 v6.50。
+- ✅ 修复 P0：`install_landing.sh` 内置 `DEFAULT_AWG_DKMS_REF` 并初始化 `AWG_DKMS_REF`，避免 `bash <(curl ...)` 且已有模块时在 `set -u` 下退出。
+- ✅ 采纳 P1：AWG 新混淆参数收窄为 `JC=4-8`、默认 `JMIN=50`、`JMAX=200`、`S1/S2` 小范围递增；已有参数继续幂等复用，需轮换时用 `FORCE_ROTATE_OBFS=1`。
+- ✅ 采纳 P1：落地机健康检查写入 `AWG_BACKEND`，仅内核后端尝试 `modprobe amneziawg`；AWG 重启退避默认上限降为 300 秒，可用 `AWG_MAX_COOLDOWN` 覆盖。
+- ✅ 采纳 P1：`install_amneziawg_dkms.sh` 在 `GITEE_MIRROR=1` 时增加 Gitee tarball 回退，失败后再回退 GitHub tarball。
+- ✅ 采纳 P1：DKMS 自愈 systemd `ExecStart` 改为调用 `/usr/local/bin/awg-dkms-health.sh`，脚本运行时读取 `/var/lib/amneziawg-dkms/ref`。
+- ✅ 采纳 P1：`ghost-transit-ctl add-landing` 写入配置后自动执行 `reload-rules`，失败时提示手动命令。
+- ✅ 采纳 P1/P2：中转机默认 `DISABLE_ON_ICMP_FAIL=0` 且落地机已启用时跳过 ICMP 探测，减少周期性检测流量；禁用落地机仍会探测以便恢复。
+- ✅ 采纳 P1：删除 `APPEND_PUBLIC_DNS=1` 路径残留的 `chattr -i /etc/resolv.conf`。
+- ✅ 采纳 P1：清理 v6.46-v6.48 历史快照，仓库保留稳定入口、v6.49 与 v6.50 快照。
+- ✅ 已执行 `bash -n`：稳定入口、v6.50 快照及仓库内保留的全部 `.sh` 均通过。
+- ⚖️ 评判：预编译用户态 `amneziawg-go`/`awg-tools` 方案采纳，但不把二进制直接塞入 git，也不填写不存在的 Release URL/SHA256；待真实 GitHub Release artifacts 发布后再填 `versions.conf`。
+- ❌ 驳回：预编译 `.ko` 内核模块继续不采纳，因 vermagic 与内核 ABI 强绑定，跨 VPS 不可靠。
+- ❌ 驳回：Hysteria2/REALITY/WebSocket/CDN 等第三轨不进入默认主线，避免增加应用层暴露面；备用方案如需做，应单独脚本且不影响中转机纯 nftables。
+
 # v6.49 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.49.sh`、`install_transit_v6.49.sh`、`install_amneziawg_dkms_v6.49.sh`，并同步稳定入口到 v6.49。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.49"
+VERSION="6.50"
 MODULE_NAME="amneziawg"
 DEFAULT_REPO_URL="https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git"
 # AmneziaWG upstream source refs pinned on 2026-05-20 for reproducible builds.
@@ -306,7 +306,7 @@ write_ref_state() {
 clone_source() {
     WORK_DIR=$(mktemp -d)
     info "下载 AmneziaWG 内核模块源码: ${AWG_DKMS_REF}"
-    local attempt tarball_url archive extracted
+    local attempt tarball_url archive extracted gitee_tarball
     for attempt in 1 2 3; do
         rm -rf "${WORK_DIR}/src"
         if git clone --depth 1 --config http.lowSpeedLimit=1000 --config http.lowSpeedTime=60 \
@@ -320,12 +320,31 @@ clone_source() {
     done
 
     tarball_url="${TARBALL_URL}"
-    if [[ -z "${tarball_url}" && "${REPO_URL}" == "${DEFAULT_REPO_URL}" ]]; then
+    if [[ -z "${tarball_url}" && ( "${REPO_URL}" == "${DEFAULT_REPO_URL}" || "${GITEE_MIRROR:-0}" == "1" ) ]]; then
         tarball_url="${DEFAULT_TARBALL_URL}"
     fi
     if [[ -n "${tarball_url}" ]]; then
         warn "git clone 不可用，改用源码 tarball 回退下载"
         archive="${WORK_DIR}/src.tar.gz"
+        if [[ "${GITEE_MIRROR:-0}" == "1" && -z "${AWG_DKMS_TARBALL_URL:-}" ]]; then
+            gitee_tarball="https://gitee.com/mirrors/amneziawg-linux-kernel-module/repository/archive/${AWG_DKMS_REF}.tar.gz"
+            for attempt in 1 2; do
+                if curl -fsSL --connect-timeout 10 --retry 2 "${gitee_tarball}" -o "${archive}" \
+                    && mkdir -p "${WORK_DIR}/tar" \
+                    && tar -xzf "${archive}" -C "${WORK_DIR}/tar"; then
+                    extracted=$(find "${WORK_DIR}/tar" -mindepth 1 -maxdepth 1 -type d | head -1 || true)
+                    if [[ -n "${extracted}" && -d "${extracted}" ]]; then
+                        rm -rf "${WORK_DIR}/src"
+                        mv "${extracted}" "${WORK_DIR}/src"
+                        return 0
+                    fi
+                fi
+                rm -rf "${WORK_DIR}/tar" "${archive}"
+                warn "Gitee tarball 下载失败（尝试 ${attempt}/2）"
+                [[ ${attempt} -lt 2 ]] && sleep 3
+            done
+            warn "Gitee tarball 失败，回退 GitHub tarball"
+        fi
         for attempt in 1 2 3; do
             if curl -fsSL --connect-timeout 10 --retry 3 "${tarball_url}" -o "${archive}" \
                 && mkdir -p "${WORK_DIR}/tar" \
@@ -492,6 +511,40 @@ ensure_health_service() {
             "https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms_v${VERSION}.sh" \
             -o /usr/local/bin/install_amneziawg_dkms.sh 2>/dev/null && chmod +x /usr/local/bin/install_amneziawg_dkms.sh || true
     fi
+    cat > /usr/local/bin/awg-dkms-health.sh <<'EOF'
+#!/usr/bin/env bash
+set -u
+
+module_name="${MODULE_NAME:-amneziawg}"
+ref_state="/var/lib/amneziawg-dkms/ref"
+ref="$(cat "${ref_state}" 2>/dev/null || true)"
+kver="$(uname -r)"
+
+if modprobe "${module_name}" 2>/dev/null && [[ -n "${ref}" ]] && grep -qx "${ref}" "${ref_state}" 2>/dev/null; then
+    exit 0
+fi
+
+if [[ ! -f "/lib/modules/${kver}/build/Makefile" ]]; then
+    echo "SKIP: no complete kernel headers for ${kver}" >&2
+    exit 0
+fi
+
+if [[ ! -x /usr/local/bin/install_amneziawg_dkms.sh ]]; then
+    echo "SKIP: /usr/local/bin/install_amneziawg_dkms.sh is missing" >&2
+    exit 0
+fi
+
+for i in 1 2 3; do
+    FORCE_REINSTALL=1 AWG_DKMS_REF="${ref:-${AWG_DKMS_REF:-}}" AWG_TOOLS_REF="${AWG_TOOLS_REF:-}" \
+        /usr/local/bin/install_amneziawg_dkms.sh && exit 0
+    sleep 30
+done
+
+echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2
+exit 1
+EOF
+    chmod +x /usr/local/bin/awg-dkms-health.sh
+
     cat > /etc/systemd/system/ghost-awg-dkms-check.service <<EOF
 [Unit]
 Description=AmneziaWG DKMS Module Health Check
@@ -503,7 +556,7 @@ Environment=DKMS_VERSION=${DKMS_VERSION}
 Environment=GCC_VERSION=${GCC_VERSION}
 Environment=AWG_DKMS_REF=${AWG_DKMS_REF}
 Environment=AWG_TOOLS_REF=${AWG_TOOLS_REF}
-ExecStart=/bin/bash -c 'kver="\$(uname -r)"; ref_state="/var/lib/amneziawg-dkms/ref"; if modprobe ${MODULE_NAME} 2>/dev/null && grep -qx "\${AWG_DKMS_REF}" "\${ref_state}" 2>/dev/null; then exit 0; fi; test -f "/lib/modules/\${kver}/build/Makefile" || { echo "SKIP: no complete kernel headers for \${kver}" >&2; exit 0; }; for i in 1 2 3; do FORCE_REINSTALL=1 AWG_DKMS_REF="\${AWG_DKMS_REF}" AWG_TOOLS_REF="\${AWG_TOOLS_REF}" /usr/local/bin/install_amneziawg_dkms.sh && exit 0; sleep 30; done; echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2; exit 1'
+ExecStart=/usr/local/bin/awg-dkms-health.sh
 RemainAfterExit=yes
 
 [Install]

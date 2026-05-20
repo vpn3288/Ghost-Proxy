@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.49.sh — 落地机安装脚本
-# 版本: v6.49 (2026-05-20)
-# v6.49 - 放宽 AWG 默认混淆范围、修正 IPv6 防火墙策略兼容性。
+# install_landing_v6.50.sh — 落地机安装脚本
+# 版本: v6.50 (2026-05-20)
+# v6.50 - 补齐 AWG_DKMS_REF 内置默认值，收窄 AWG 混淆默认范围并修正健康检查。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.49"
+VERSION="6.50"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
 DEFAULT_GCC_VERSION="12"
 DEFAULT_SINGBOX_VERSION="1.11.0"
+DEFAULT_AWG_DKMS_REF="ac946a9df100a17d342b5982d1947deef1b51952"
 DEFAULT_AWG_TOOLS_REF="5d6179a6d0842e98dfb349c28cf1bd8e4b9d1079"
 DEFAULT_AWG_GO_REF="f4f4c999267437c3eb909e8d0e5278fb4596d9a7"
 
@@ -33,6 +34,7 @@ load_versions_config
 DKMS_VERSION="${DKMS_VERSION:-${DEFAULT_DKMS_VERSION}}"
 GCC_VERSION="${GCC_VERSION:-${DEFAULT_GCC_VERSION}}"
 SINGBOX_VERSION="${SINGBOX_VERSION:-${DEFAULT_SINGBOX_VERSION}}"
+AWG_DKMS_REF="${AWG_DKMS_REF:-${DEFAULT_AWG_DKMS_REF}}"
 AWG_TOOLS_REF="${AWG_TOOLS_REF:-${DEFAULT_AWG_TOOLS_REF}}"
 AWG_GO_REF="${AWG_GO_REF:-${DEFAULT_AWG_GO_REF}}"
 PREBUILT_AWG_GO_URL_x86_64="${PREBUILT_AWG_GO_URL_x86_64:-}"
@@ -875,7 +877,6 @@ EOF
             warn "建议手动执行: resolvectl dns global 1.1.1.1 8.8.8.8"
             log "WARN" "/etc/resolv.conf 是符号链接，跳过 APPEND_PUBLIC_DNS 追加"
         else
-            chattr -i /etc/resolv.conf 2>/dev/null || true
             touch /etc/resolv.conf
             grep -q '^nameserver 1\.1\.1\.1$' /etc/resolv.conf 2>/dev/null || echo "nameserver 1.1.1.1" >> /etc/resolv.conf
             grep -q '^nameserver 8\.8\.8\.8$' /etc/resolv.conf 2>/dev/null || echo "nameserver 8.8.8.8" >> /etc/resolv.conf
@@ -1345,14 +1346,14 @@ rand_h() {
 }
 
 generate_new_obfs_values() {
-    JC=$((4 + RANDOM % 9))
-    JMIN="${AWG_JMIN:-64}"
-    JMAX="${AWG_JMAX:-256}"
+    JC=$((4 + RANDOM % 5))
+    JMIN="${AWG_JMIN:-50}"
+    JMAX="${AWG_JMAX:-200}"
     [[ "${JMIN}" =~ ^[0-9]+$ && "${JMAX}" =~ ^[0-9]+$ ]] || die "AWG_JMIN/AWG_JMAX 必须是数字"
-    (( JMIN >= 64 && JMAX <= 1024 && JMAX > JMIN )) || die "AWG_JMIN/AWG_JMAX 范围无效，应满足 64 <= JMIN < JMAX <= 1024"
-    S1=$((15 + RANDOM % 136))
+    (( JMIN >= 50 && JMAX <= 1024 && JMAX > JMIN )) || die "AWG_JMIN/AWG_JMAX 范围无效，应满足 50 <= JMIN < JMAX <= 1024"
+    S1=$((1 + RANDOM % 100))
     while true; do
-        S2=$((15 + RANDOM % 136))
+        S2=$((S1 + 1 + RANDOM % 100))
         [[ $((S1 + 56)) -ne "${S2}" ]] && break
     done
     while true; do
@@ -1380,7 +1381,7 @@ valid_obfuscation_params() {
 
 recommended_obfuscation_params() {
     [[ "${JMIN:-}" =~ ^[0-9]+$ && "${JMAX:-}" =~ ^[0-9]+$ ]] || return 1
-    (( JMIN >= 64 && JMAX <= 1024 && JMAX > JMIN )) || return 1
+    (( JMIN >= 50 && JMAX <= 200 && JMAX > JMIN )) || return 1
 }
 
 write_obfuscation_params() {
@@ -1414,7 +1415,7 @@ generate_obfuscation_params() {
             generate_new_obfs_values
             write_obfuscation_params "${params_file}"
         elif ! recommended_obfuscation_params; then
-            warn "已有 AWG Jmin/Jmax 不在 64-1024 推荐范围；为保持客户端兼容不自动轮换，如需重置请设置 FORCE_ROTATE_OBFS=1"
+            warn "已有 AWG Jmin/Jmax 不在 50-200 链式代理推荐范围；为保持客户端兼容不自动轮换，如需重置请设置 FORCE_ROTATE_OBFS=1"
         fi
         info "复用已有混淆参数（幂等性保护）"
     else
@@ -1755,6 +1756,11 @@ SS_MAIN_FAIL_COUNT=0
 SS_BACKUP_FAIL_COUNT=0
 MAX_FAIL_COUNT=3
 AWG_COOLDOWN=10
+AWG_BACKEND="${AWG_BACKEND:-kernel}"
+AWG_MAX_COOLDOWN="${AWG_MAX_COOLDOWN:-300}"
+case "${AWG_MAX_COOLDOWN}" in
+    ''|*[!0-9]*) AWG_MAX_COOLDOWN=300 ;;
+esac
 
 while true; do
     if ! ip addr show awg0 2>/dev/null | grep -q "10.8.0.1"; then
@@ -1765,7 +1771,7 @@ while true; do
 
         if [ "\${AWG_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
             log_health warn "AWG连续失败\${MAX_FAIL_COUNT}次，执行重启"
-            if ! lsmod | grep -q '^amneziawg'; then
+            if [ "\${AWG_BACKEND}" = "kernel" ] && ! lsmod | grep -q '^amneziawg'; then
                 log_health warn "AWG内核模块缺失，尝试加载"
                 modprobe amneziawg 2>/dev/null || log_health error "modprobe amneziawg 失败"
             fi
@@ -1778,7 +1784,7 @@ while true; do
                 else
                     log_health warn "AWG重启后仍异常，冷却时间增加到 \${AWG_COOLDOWN}s"
                     AWG_COOLDOWN=\$((AWG_COOLDOWN * 2))
-                    [ "\${AWG_COOLDOWN}" -gt 3600 ] && AWG_COOLDOWN=3600
+                    [ "\${AWG_COOLDOWN}" -gt "\${AWG_MAX_COOLDOWN}" ] && AWG_COOLDOWN="\${AWG_MAX_COOLDOWN}"
                 fi
             else
                 log_health error "awg-landing重启失败"
@@ -1851,6 +1857,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 Environment="HEALTH_LOG_LEVEL=${HEALTH_LOG_LEVEL:-warn}"
+Environment="AWG_BACKEND=${AWG_BACKEND:-kernel}"
+Environment="AWG_MAX_COOLDOWN=${AWG_MAX_COOLDOWN:-300}"
 ExecStart=/usr/local/bin/landing-health-check.sh
 Restart=always
 RestartSec=20s

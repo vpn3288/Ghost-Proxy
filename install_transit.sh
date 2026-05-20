@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_transit_v6.49.sh — 中转机安装脚本
-# 版本: v6.49 (2026-05-20)
-# v6.49 - 原子化加载 Ghost nftables 表，补齐健康检查依赖。
+# install_transit_v6.50.sh — 中转机安装脚本
+# 版本: v6.50 (2026-05-20)
+# v6.50 - add-landing 后自动加载 nftables 规则，减少默认健康检查 ICMP 流量。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 版本号
-VERSION="6.49"
+VERSION="6.50"
 SCRIPT_NAME="install_transit_v${VERSION}.sh"
 CONFIG_DIR="/etc/ghost-transit"
 CONFIG_FILE="${CONFIG_DIR}/config.json"
@@ -1081,7 +1081,11 @@ cmd_add_landing() {
     echo "✓ 已添加落地机: ${name} (${ip}:${ssh_port})"
     echo "  - ${awg_listen}/udp -> ${ip}:${awg_target}"
     echo "  - ${ss_listen}/tcp -> ${ip}:${ss_target}"
-    echo "⚠️  请运行 'ghost-transit-ctl reload-rules' 重新生成规则"
+    if cmd_reload_rules; then
+        echo "✓ nftables 规则已自动加载"
+    else
+        echo "⚠️  规则自动加载失败，请手动运行: ghost-transit-ctl reload-rules"
+    fi
 }
 
 cmd_add_port() {
@@ -1254,6 +1258,10 @@ for ((i=0; i<landings_count; i++)); do
     IFS=$'\t' read -r ip enabled name <<< "${landing_line}"
     if [[ -z "${ip}" ]]; then
         log "ERROR: 第 ${i} 个落地机 IP 为空，跳过"
+        continue
+    fi
+
+    if [[ "${DISABLE_ON_ICMP_FAIL:-0}" != "1" && "${enabled}" == "true" ]]; then
         continue
     fi
     

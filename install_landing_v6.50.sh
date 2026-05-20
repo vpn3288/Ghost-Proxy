@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.47.sh — 落地机安装脚本
-# 版本: v6.47 (2026-05-20)
-# v6.47 - 修复重跑自占端口、健康检查首次盲区并精简 SS 配置生成。
+# install_landing_v6.50.sh — 落地机安装脚本
+# 版本: v6.50 (2026-05-20)
+# v6.50 - 补齐 AWG_DKMS_REF 内置默认值，收窄 AWG 混淆默认范围并修正健康检查。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.47"
+VERSION="6.50"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
 DEFAULT_GCC_VERSION="12"
 DEFAULT_SINGBOX_VERSION="1.11.0"
+DEFAULT_AWG_DKMS_REF="ac946a9df100a17d342b5982d1947deef1b51952"
 DEFAULT_AWG_TOOLS_REF="5d6179a6d0842e98dfb349c28cf1bd8e4b9d1079"
 DEFAULT_AWG_GO_REF="f4f4c999267437c3eb909e8d0e5278fb4596d9a7"
 
@@ -33,6 +34,7 @@ load_versions_config
 DKMS_VERSION="${DKMS_VERSION:-${DEFAULT_DKMS_VERSION}}"
 GCC_VERSION="${GCC_VERSION:-${DEFAULT_GCC_VERSION}}"
 SINGBOX_VERSION="${SINGBOX_VERSION:-${DEFAULT_SINGBOX_VERSION}}"
+AWG_DKMS_REF="${AWG_DKMS_REF:-${DEFAULT_AWG_DKMS_REF}}"
 AWG_TOOLS_REF="${AWG_TOOLS_REF:-${DEFAULT_AWG_TOOLS_REF}}"
 AWG_GO_REF="${AWG_GO_REF:-${DEFAULT_AWG_GO_REF}}"
 PREBUILT_AWG_GO_URL_x86_64="${PREBUILT_AWG_GO_URL_x86_64:-}"
@@ -100,8 +102,6 @@ uninstall() {
     
     if [[ "${choice}" == "1" ]]; then
         # 完全卸载
-        chattr -i /etc/resolv.conf 2>/dev/null || true
-        
         # 兼容清理旧版残留链，不破坏 1Panel/Docker
         for chain in $(iptables -L -n | grep "^Chain PORTSCAN_" | awk '{print $2}'); do
             local port=${chain#PORTSCAN_}
@@ -114,54 +114,32 @@ uninstall() {
             iptables -X "${chain}" 2>/dev/null || true
         done
         
-        echo -e "${YELLOW}正在精准删除防火墙规则...${NC}"
-        
-        # 删除基础规则
-        while iptables -D INPUT -i lo -j ACCEPT 2>/dev/null; do :; done
-        while iptables -D INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null; do :; done
-        while iptables -D INPUT -i docker0 -j ACCEPT 2>/dev/null; do :; done
-        while iptables -D INPUT -i br-+ -j ACCEPT 2>/dev/null; do :; done
-        while iptables -D INPUT -i awg0 -j ACCEPT 2>/dev/null; do :; done
-        
-        # 删除 SSH 保护规则
-        while iptables -D INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null; do :; done
-        while iptables -D INPUT -p tcp --dport 65022 -j ACCEPT 2>/dev/null; do :; done
-        
-        # 删除中转机相关规则（按 metadata 里的真实端口清理）
-        local ports_json=""
+        echo -e "${YELLOW}正在删除 Ghost-Proxy 专属防火墙规则...${NC}"
+
+        if command -v iptables-save >/dev/null 2>&1 && command -v iptables-restore >/dev/null 2>&1; then
+            iptables-save | grep -v 'ghost-proxy-landing' | iptables-restore 2>/dev/null || true
+        fi
+
+        local ports_json="" transit_ip="" meta_awg_port="" meta_ss_backup_port=""
         if command -v jq >/dev/null 2>&1 && [[ -f "${CONFIG_DIR}/metadata.json" ]]; then
             ports_json=$(jq -r '[.awg_port, .ss_backup_port, .transit_awg_listen_port, .transit_ss_listen_port] | map(select(.!=null)) | unique[]' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+            transit_ip=$(jq -r '.transit_ip // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+            meta_awg_port=$(jq -r '.awg_port // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+            meta_ss_backup_port=$(jq -r '.ss_backup_port // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+        fi
+
+        if [[ -n "${transit_ip}" ]]; then
+            [[ -n "${meta_awg_port}" ]] && while iptables -D INPUT -s "${transit_ip}" -p udp --dport "${meta_awg_port}" -j ACCEPT 2>/dev/null; do :; done
+            [[ -n "${meta_ss_backup_port}" ]] && while iptables -D INPUT -s "${transit_ip}" -p tcp --dport "${meta_ss_backup_port}" -j ACCEPT 2>/dev/null; do :; done
+            while iptables -D INPUT -s "${transit_ip}" -p icmp --icmp-type echo-request -j ACCEPT 2>/dev/null; do :; done
         fi
         for port in ${ports_json}; do
-            for proto in tcp udp; do
-                while true; do
-                    local line_num
-                    line_num=$(iptables -L INPUT -n --line-numbers 2>/dev/null | grep "${proto} dpt:${port}" | tail -1 | awk '{print $1}')
-                    [[ -z "${line_num}" ]] && break
-                    iptables -D INPUT "${line_num}" 2>/dev/null || break
-                done
-            done
+            while iptables -D INPUT -p udp --dport "${port}" -j DROP 2>/dev/null; do :; done
+            while iptables -D INPUT -p tcp --dport "${port}" -j DROP 2>/dev/null; do :; done
         done
-        
-        # 删除 ICMP 规则
-        while true; do
-            local line_num=$(iptables -L INPUT -n --line-numbers | grep "icmptype 8" | tail -1 | awk '{print $1}')
-            [[ -z "${line_num}" ]] && break
-            iptables -D INPUT "${line_num}" 2>/dev/null || break
-        done
-        
-        # 删除 DNS 劫持规则
-        iptables -t nat -D OUTPUT -p udp --dport 53 -j DNAT --to-destination 1.1.1.1:53 2>/dev/null || true
-        iptables -t nat -D OUTPUT -p tcp --dport 53 -j DNAT --to-destination 1.1.1.1:53 2>/dev/null || true
-        
-        # 恢复默认策略（不执行 iptables -F，保留 1Panel/Docker 规则）
-        iptables -P INPUT ACCEPT
-        ip6tables -P INPUT ACCEPT 2>/dev/null || true
-        ip6tables -P FORWARD ACCEPT 2>/dev/null || true
-        ip6tables -P OUTPUT ACCEPT 2>/dev/null || true
         
         netfilter-persistent save 2>/dev/null || true
-        echo -e "${GREEN}防火墙规则已精准删除（保留 1Panel/Docker 规则）${NC}"
+        echo -e "${GREEN}Ghost-Proxy 防火墙规则已删除（保留通用 INPUT、SSH、Docker/1Panel 规则和默认策略）${NC}"
         
         # 清理策略路由
         ip rule del table 100 2>/dev/null || true
@@ -814,8 +792,19 @@ install_dependencies() {
         iptables iptables-persistent \
         openssl netcat-openbsd iputils-tracepath || die "依赖安装失败（3次尝试）"
 
-    if curl -fsSL --connect-timeout 10 --retry 3 \
-        "https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms.sh" \
+    local script_dir dkms_source=""
+    script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P || pwd)"
+    for path in "${script_dir}/install_amneziawg_dkms_v${VERSION}.sh" "${script_dir}/install_amneziawg_dkms.sh"; do
+        if [[ -f "${path}" ]]; then
+            dkms_source="${path}"
+            break
+        fi
+    done
+    if [[ -n "${dkms_source}" ]]; then
+        install -m 0755 "${dkms_source}" /usr/local/bin/install_amneziawg_dkms.sh
+        cp /usr/local/bin/install_amneziawg_dkms.sh /root/install_amneziawg_dkms.sh 2>/dev/null || true
+    elif curl -fsSL --connect-timeout 10 --retry 3 \
+        "https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms_v${VERSION}.sh" \
         -o /usr/local/bin/install_amneziawg_dkms.sh 2>/dev/null; then
         chmod +x /usr/local/bin/install_amneziawg_dkms.sh
         cp /usr/local/bin/install_amneziawg_dkms.sh /root/install_amneziawg_dkms.sh 2>/dev/null || true
@@ -846,21 +835,24 @@ EOF
     success "IPv6 已完全禁用（sysctl）"
     log "INFO" "IPv6 sysctl 禁用已应用"
     
-    # 强制阻断 IPv6 出站流量（ip6tables层）
+    # 阻断 IPv6 入站和转发，OUTPUT 保持 ACCEPT 以避免影响 Docker/1Panel 内部链路
     if command -v ip6tables &>/dev/null; then
-        ip6tables -P INPUT DROP 2>/dev/null || true
+        ip6tables -P INPUT ACCEPT 2>/dev/null || true
         ip6tables -P FORWARD DROP 2>/dev/null || true
-        ip6tables -P OUTPUT DROP 2>/dev/null || true
-        # 允许本地回环
-        ip6tables -C INPUT -i lo -j ACCEPT 2>/dev/null || ip6tables -A INPUT -i lo -j ACCEPT 2>/dev/null || true
-        ip6tables -C OUTPUT -o lo -j ACCEPT 2>/dev/null || ip6tables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
+        ip6tables -P OUTPUT ACCEPT 2>/dev/null || true
+        ip6tables -N GHOST_IPV6_INPUT 2>/dev/null || true
+        ip6tables -F GHOST_IPV6_INPUT 2>/dev/null || true
+        ip6tables -A GHOST_IPV6_INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+        ip6tables -A GHOST_IPV6_INPUT -i lo -j ACCEPT 2>/dev/null || true
+        ip6tables -A GHOST_IPV6_INPUT -j DROP 2>/dev/null || true
+        ip6tables -C INPUT -j GHOST_IPV6_INPUT 2>/dev/null || ip6tables -I INPUT 1 -j GHOST_IPV6_INPUT 2>/dev/null || true
         
         # 保存规则
         if command -v netfilter-persistent &>/dev/null; then
             netfilter-persistent save &>/dev/null || true
         fi
-        success "IPv6 出站流量已彻底阻断（ip6tables层）"
-        log "INFO" "ip6tables DROP 策略已应用"
+        success "IPv6 入站和转发已阻断，OUTPUT 保持兼容（ip6tables层）"
+        log "INFO" "ip6tables IPv6 INPUT chain and FORWARD policy applied, OUTPUT kept ACCEPT"
     else
         warn "ip6tables 未安装，跳过防火墙层 IPv6 阻断"
     fi
@@ -885,7 +877,6 @@ EOF
             warn "建议手动执行: resolvectl dns global 1.1.1.1 8.8.8.8"
             log "WARN" "/etc/resolv.conf 是符号链接，跳过 APPEND_PUBLIC_DNS 追加"
         else
-            chattr -i /etc/resolv.conf 2>/dev/null || true
             touch /etc/resolv.conf
             grep -q '^nameserver 1\.1\.1\.1$' /etc/resolv.conf 2>/dev/null || echo "nameserver 1.1.1.1" >> /etc/resolv.conf
             grep -q '^nameserver 8\.8\.8\.8$' /etc/resolv.conf 2>/dev/null || echo "nameserver 8.8.8.8" >> /etc/resolv.conf
@@ -924,8 +915,8 @@ install_amneziawg_dkms_standalone() {
     
     if [[ -z "${script}" ]]; then
         for path in \
-            "${script_dir}/install_amneziawg_dkms.sh" \
             "${script_dir}/install_amneziawg_dkms_v${VERSION}.sh" \
+            "${script_dir}/install_amneziawg_dkms.sh" \
             /usr/local/bin/install_amneziawg_dkms.sh \
             /root/install_amneziawg_dkms.sh \
             /tmp/install_amneziawg_dkms.sh; do
@@ -940,7 +931,7 @@ install_amneziawg_dkms_standalone() {
         warn "未找到 DKMS 脚本，尝试从 GitHub 下载..."
         script="/tmp/install_amneziawg_dkms.sh"
         if ! curl -fsSL --connect-timeout 10 --retry 3 \
-            "https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms.sh" \
+            "https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms_v${VERSION}.sh" \
             -o "${script}"; then
             warn "DKMS 脚本下载失败，将尝试 amneziawg-go 用户态后端"
             return 1
@@ -1355,12 +1346,14 @@ rand_h() {
 }
 
 generate_new_obfs_values() {
-    JC=$((4 + RANDOM % 9))
-    JMIN=8
-    JMAX=80
-    S1=$((15 + RANDOM % 136))
+    JC=$((4 + RANDOM % 5))
+    JMIN="${AWG_JMIN:-50}"
+    JMAX="${AWG_JMAX:-200}"
+    [[ "${JMIN}" =~ ^[0-9]+$ && "${JMAX}" =~ ^[0-9]+$ ]] || die "AWG_JMIN/AWG_JMAX 必须是数字"
+    (( JMIN >= 50 && JMAX <= 1024 && JMAX > JMIN )) || die "AWG_JMIN/AWG_JMAX 范围无效，应满足 50 <= JMIN < JMAX <= 1024"
+    S1=$((1 + RANDOM % 100))
     while true; do
-        S2=$((15 + RANDOM % 136))
+        S2=$((S1 + 1 + RANDOM % 100))
         [[ $((S1 + 56)) -ne "${S2}" ]] && break
     done
     while true; do
@@ -1384,6 +1377,11 @@ valid_obfuscation_params() {
     (( H1 >= 5 && H2 >= 5 && H3 >= 5 && H4 >= 5 )) || return 1
     [[ "${H1}" != "${H2}" && "${H1}" != "${H3}" && "${H1}" != "${H4}" && "${H2}" != "${H3}" && "${H2}" != "${H4}" && "${H3}" != "${H4}" ]] || return 1
     return 0
+}
+
+recommended_obfuscation_params() {
+    [[ "${JMIN:-}" =~ ^[0-9]+$ && "${JMAX:-}" =~ ^[0-9]+$ ]] || return 1
+    (( JMIN >= 50 && JMAX <= 200 && JMAX > JMIN )) || return 1
 }
 
 write_obfuscation_params() {
@@ -1412,6 +1410,12 @@ generate_obfuscation_params() {
             warn "检测到旧版或不安全 AWG 混淆参数，已按推荐范围重新生成"
             generate_new_obfs_values
             write_obfuscation_params "${params_file}"
+        elif [[ "${FORCE_ROTATE_OBFS:-0}" == "1" ]]; then
+            warn "FORCE_ROTATE_OBFS=1，已重新生成 AWG 混淆参数"
+            generate_new_obfs_values
+            write_obfuscation_params "${params_file}"
+        elif ! recommended_obfuscation_params; then
+            warn "已有 AWG Jmin/Jmax 不在 50-200 链式代理推荐范围；为保持客户端兼容不自动轮换，如需重置请设置 FORCE_ROTATE_OBFS=1"
         fi
         info "复用已有混淆参数（幂等性保护）"
     else
@@ -1752,6 +1756,11 @@ SS_MAIN_FAIL_COUNT=0
 SS_BACKUP_FAIL_COUNT=0
 MAX_FAIL_COUNT=3
 AWG_COOLDOWN=10
+AWG_BACKEND="${AWG_BACKEND:-kernel}"
+AWG_MAX_COOLDOWN="${AWG_MAX_COOLDOWN:-300}"
+case "${AWG_MAX_COOLDOWN}" in
+    ''|*[!0-9]*) AWG_MAX_COOLDOWN=300 ;;
+esac
 
 while true; do
     if ! ip addr show awg0 2>/dev/null | grep -q "10.8.0.1"; then
@@ -1762,7 +1771,7 @@ while true; do
 
         if [ "\${AWG_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
             log_health warn "AWG连续失败\${MAX_FAIL_COUNT}次，执行重启"
-            if ! lsmod | grep -q '^amneziawg'; then
+            if [ "\${AWG_BACKEND}" = "kernel" ] && ! lsmod | grep -q '^amneziawg'; then
                 log_health warn "AWG内核模块缺失，尝试加载"
                 modprobe amneziawg 2>/dev/null || log_health error "modprobe amneziawg 失败"
             fi
@@ -1775,7 +1784,7 @@ while true; do
                 else
                     log_health warn "AWG重启后仍异常，冷却时间增加到 \${AWG_COOLDOWN}s"
                     AWG_COOLDOWN=\$((AWG_COOLDOWN * 2))
-                    [ "\${AWG_COOLDOWN}" -gt 300 ] && AWG_COOLDOWN=300
+                    [ "\${AWG_COOLDOWN}" -gt "\${AWG_MAX_COOLDOWN}" ] && AWG_COOLDOWN="\${AWG_MAX_COOLDOWN}"
                 fi
             else
                 log_health error "awg-landing重启失败"
@@ -1848,6 +1857,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 Environment="HEALTH_LOG_LEVEL=${HEALTH_LOG_LEVEL:-warn}"
+Environment="AWG_BACKEND=${AWG_BACKEND:-kernel}"
+Environment="AWG_MAX_COOLDOWN=${AWG_MAX_COOLDOWN:-300}"
 ExecStart=/usr/local/bin/landing-health-check.sh
 Restart=always
 RestartSec=20s
@@ -2002,6 +2013,12 @@ setup_firewall() {
     
     iptables -C INPUT -p tcp --dport ${ssh_port} -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport ${ssh_port} -j ACCEPT
     
+    while iptables -D INPUT -s "${TRANSIT_IP}" -p udp --dport "${AWG_PORT}" -m comment --comment ghost-proxy-landing -j ACCEPT 2>/dev/null; do :; done
+    while iptables -D INPUT -s "${TRANSIT_IP}" -p icmp --icmp-type echo-request -m comment --comment ghost-proxy-landing -j ACCEPT 2>/dev/null; do :; done
+    while iptables -D INPUT -s "${TRANSIT_IP}" -p tcp --dport "${SS_BACKUP_PORT}" -m comment --comment ghost-proxy-landing -j ACCEPT 2>/dev/null; do :; done
+    while iptables -D INPUT -p udp --dport "${AWG_PORT}" -m comment --comment ghost-proxy-landing -j DROP 2>/dev/null; do :; done
+    while iptables -D INPUT -p tcp --dport "${SS_BACKUP_PORT}" -m comment --comment ghost-proxy-landing -j DROP 2>/dev/null; do :; done
+    while iptables -D INPUT -p udp --dport "${SS_BACKUP_PORT}" -m comment --comment ghost-proxy-landing -j DROP 2>/dev/null; do :; done
     while iptables -D INPUT -s "${TRANSIT_IP}" -p udp --dport "${AWG_PORT}" -j ACCEPT 2>/dev/null; do :; done
     while iptables -D INPUT -s "${TRANSIT_IP}" -p icmp --icmp-type echo-request -j ACCEPT 2>/dev/null; do :; done
     while iptables -D INPUT -s "${TRANSIT_IP}" -p tcp --dport "${SS_BACKUP_PORT}" -j ACCEPT 2>/dev/null; do :; done
@@ -2009,12 +2026,12 @@ setup_firewall() {
     while iptables -D INPUT -p tcp --dport "${SS_BACKUP_PORT}" -j DROP 2>/dev/null; do :; done
     while iptables -D INPUT -p udp --dport "${SS_BACKUP_PORT}" -j DROP 2>/dev/null; do :; done
 
-    iptables -A INPUT -s "${TRANSIT_IP}" -p udp --dport "${AWG_PORT}" -j ACCEPT
-    iptables -A INPUT -s "${TRANSIT_IP}" -p icmp --icmp-type echo-request -j ACCEPT
-    iptables -A INPUT -s "${TRANSIT_IP}" -p tcp --dport "${SS_BACKUP_PORT}" -j ACCEPT
-    iptables -A INPUT -p udp --dport "${AWG_PORT}" -j DROP
-    iptables -A INPUT -p tcp --dport "${SS_BACKUP_PORT}" -j DROP
-    iptables -A INPUT -p udp --dport "${SS_BACKUP_PORT}" -j DROP
+    iptables -A INPUT -s "${TRANSIT_IP}" -p udp --dport "${AWG_PORT}" -m comment --comment ghost-proxy-landing -j ACCEPT
+    iptables -A INPUT -s "${TRANSIT_IP}" -p icmp --icmp-type echo-request -m comment --comment ghost-proxy-landing -j ACCEPT
+    iptables -A INPUT -s "${TRANSIT_IP}" -p tcp --dport "${SS_BACKUP_PORT}" -m comment --comment ghost-proxy-landing -j ACCEPT
+    iptables -A INPUT -p udp --dport "${AWG_PORT}" -m comment --comment ghost-proxy-landing -j DROP
+    iptables -A INPUT -p tcp --dport "${SS_BACKUP_PORT}" -m comment --comment ghost-proxy-landing -j DROP
+    iptables -A INPUT -p udp --dport "${SS_BACKUP_PORT}" -m comment --comment ghost-proxy-landing -j DROP
     
     # ==========================================
     # 【安全红线】内网业务端口隔离

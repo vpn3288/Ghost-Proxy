@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_transit_v6.47.sh — 中转机安装脚本
-# 版本: v6.47 (2026-05-20)
-# v6.47 - 修复 nft 卸载误伤、reload 预检和管理工具 warn 缺失。
+# install_transit_v6.50.sh — 中转机安装脚本
+# 版本: v6.50 (2026-05-20)
+# v6.50 - add-landing 后自动加载 nftables 规则，减少默认健康检查 ICMP 流量。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 版本号
-VERSION="6.47"
+VERSION="6.50"
 SCRIPT_NAME="install_transit_v${VERSION}.sh"
 CONFIG_DIR="/etc/ghost-transit"
 CONFIG_FILE="${CONFIG_DIR}/config.json"
@@ -129,7 +129,7 @@ install_dependencies() {
         warn "apt-get update 失败，但继续尝试安装"
     fi
     
-    local packages=(jq nftables)
+    local packages=(jq nftables iproute2 iputils-ping coreutils util-linux)
     local missing_packages=()
     
     # 检查哪些包需要安装
@@ -700,7 +700,6 @@ setup_nftables() {
     systemctl enable nftables &>/dev/null || die "启用 nftables 服务失败"
 
     /usr/local/bin/ghost-transit-ctl reload-rules || die "生成并加载 nftables 规则失败"
-    systemctl restart nftables || die "重启 nftables 服务失败"
 
     success "nftables 防火墙配置完成"
 }
@@ -723,7 +722,10 @@ install_management_tool() {
 set -euo pipefail
 
 CONFIG_FILE="/etc/ghost-transit/config.json"
-NFT_RULES="/etc/nftables.conf"
+NFT_MAIN_CONF="/etc/nftables.conf"
+NFT_RULES="/etc/nftables.d/ghost-proxy.nft"
+GHOST_FILTER_TABLE="ghost_proxy_filter"
+GHOST_NAT_TABLE="ghost_proxy_nat"
 
 warn() {
     echo "WARN: $*" >&2
@@ -734,6 +736,55 @@ cleanup_old_backups() {
     local file_pattern="$1"
     local keep_count=3
     ls -t ${file_pattern}.bak.* 2>/dev/null | tail -n +$((keep_count + 1)) | xargs -r rm -f
+}
+
+ensure_nft_main_conf() {
+    mkdir -p "$(dirname "${NFT_RULES}")"
+    local include_line="include \"${NFT_RULES}\""
+    if [[ ! -f "${NFT_MAIN_CONF}" ]]; then
+        cat > "${NFT_MAIN_CONF}" <<EOF
+#!/usr/sbin/nft -f
+# Ghost-Proxy nftables loader
+${include_line}
+EOF
+        return 0
+    fi
+    if ! grep -Fq "${include_line}" "${NFT_MAIN_CONF}" 2>/dev/null; then
+        cp "${NFT_MAIN_CONF}" "${NFT_MAIN_CONF}.bak.$(date +%s)" 2>/dev/null || true
+        printf '\n# Ghost-Proxy nftables include\n%s\n' "${include_line}" >> "${NFT_MAIN_CONF}"
+    fi
+}
+
+check_ghost_rules() {
+    local rules_file="$1"
+    local check_file="${rules_file}.check.$$"
+    sed \
+        -e "s/table inet ${GHOST_FILTER_TABLE}/table inet ${GHOST_FILTER_TABLE}_check_$$/g" \
+        -e "s/table inet ${GHOST_NAT_TABLE}/table inet ${GHOST_NAT_TABLE}_check_$$/g" \
+        "${rules_file}" > "${check_file}"
+    if nft -c -f "${check_file}" >/dev/null 2>&1; then
+        rm -f "${check_file}"
+        return 0
+    fi
+    rm -f "${check_file}"
+    return 1
+}
+
+load_ghost_rules() {
+    local rules_file="$1"
+    local load_file="${rules_file}.load.$$"
+    ensure_nft_main_conf
+    {
+        echo "destroy table inet ${GHOST_FILTER_TABLE}"
+        echo "destroy table inet ${GHOST_NAT_TABLE}"
+        cat "${rules_file}"
+    } > "${load_file}"
+    if nft -c -f "${load_file}" >/dev/null 2>&1 && nft -f "${load_file}"; then
+        rm -f "${load_file}"
+        return 0
+    fi
+    rm -f "${load_file}"
+    return 1
 }
 
 validate_ip() {
@@ -771,7 +822,7 @@ cmd_status() {
 
 cmd_reload() {
     echo "重新加载 nftables 规则..."
-    if nft -c -f "${NFT_RULES}" && nft -f "${NFT_RULES}"; then
+    if check_ghost_rules "${NFT_RULES}" && load_ghost_rules "${NFT_RULES}"; then
         echo "✓ 重新加载成功"
     else
         echo "✗ 规则验证或加载失败"
@@ -798,6 +849,7 @@ cmd_reload_rules() {
     printf '%s\n' "$$" > "${lock_file}" 2>/dev/null || true
     
     echo "重新生成并加载 nftables 规则..."
+    mkdir -p "$(dirname "${NFT_RULES}")"
     
     # 备份当前规则
     if [[ -f "${NFT_RULES}" ]]; then
@@ -859,8 +911,7 @@ cmd_reload_rules() {
         
         "#!/usr/sbin/nft -f\n" +
         "# Ghost-Proxy nftables rules\n\n" +
-        "flush ruleset\n\n" +
-        "table inet filter {\n" +
+        "table inet ghost_proxy_filter {\n" +
         (if $use_ft then
             "    flowtable ft {\n" +
             "        hook ingress priority 0;\n" +
@@ -889,7 +940,7 @@ cmd_reload_rules() {
         "        type filter hook output priority filter; policy accept;\n" +
         "    }\n" +
         "}\n\n" +
-        "table inet nat {\n" +
+        "table inet ghost_proxy_nat {\n" +
         "    chain prerouting {\n" +
         "        type nat hook prerouting priority dstnat; policy accept;\n\n" +
         dnat_rules + "\n" +
@@ -915,7 +966,7 @@ cmd_reload_rules() {
     # 写入临时文件（P0 修复：使用临时文件，使用 printf 正确处理转义字符）
     printf '%s' "${nft_content}" > "${tmp_rules}"
     
-    if nft -c -f "${tmp_rules}" >/dev/null 2>&1 && nft -f "${tmp_rules}"; then
+    if check_ghost_rules "${tmp_rules}" && load_ghost_rules "${tmp_rules}"; then
         mv "${tmp_rules}" "${NFT_RULES}"
         echo "✓ 规则重新生成并加载成功"
         return 0
@@ -1030,7 +1081,11 @@ cmd_add_landing() {
     echo "✓ 已添加落地机: ${name} (${ip}:${ssh_port})"
     echo "  - ${awg_listen}/udp -> ${ip}:${awg_target}"
     echo "  - ${ss_listen}/tcp -> ${ip}:${ss_target}"
-    echo "⚠️  请运行 'ghost-transit-ctl reload-rules' 重新生成规则"
+    if cmd_reload_rules; then
+        echo "✓ nftables 规则已自动加载"
+    else
+        echo "⚠️  规则自动加载失败，请手动运行: ghost-transit-ctl reload-rules"
+    fi
 }
 
 cmd_add_port() {
@@ -1096,6 +1151,15 @@ if [[ ! -x "${CTL_BIN}" ]]; then
     CTL_BIN="$(command -v ghost-transit-ctl 2>/dev/null || true)"
 fi
 
+case "${HEALTH_LOG_LEVEL}" in
+    error|warn|info) ;;
+    *)
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [HEALTH] WARN: HEALTH_LOG_LEVEL=${HEALTH_LOG_LEVEL} 无效，已使用 warn" >> "${LOG_FILE}" 2>/dev/null || true
+        logger -t ghost-transit "WARN: HEALTH_LOG_LEVEL=${HEALTH_LOG_LEVEL} 无效，已使用 warn" 2>/dev/null || true
+        HEALTH_LOG_LEVEL="warn"
+        ;;
+esac
+
 log() {
     local level="INFO"
     local msg="$1"
@@ -1106,7 +1170,6 @@ log() {
         error) [[ "${level}" == "ERROR" ]] || return 0 ;;
         warn) [[ "${level}" =~ ^(WARN|ERROR)$ ]] || return 0 ;;
         info) ;;
-        *) ;;
     esac
     echo "$(date '+%Y-%m-%d %H:%M:%S') [HEALTH] ${msg}" >> "${LOG_FILE}" 2>/dev/null || true
     logger -t ghost-transit "${msg}" 2>/dev/null || true
@@ -1144,45 +1207,46 @@ if ! flock -n 200; then
 fi
 
 while true; do
-sleep $((1800 + RANDOM % 1800))
-
 if [[ ! -s "${CONFIG_FILE}" ]]; then
     log "ERROR: 配置文件不存在或为空，跳过本轮健康检查"
+    sleep $((1800 + RANDOM % 1800))
     continue
 fi
 
 if ! jq -e '.landings | type == "array"' "${CONFIG_FILE}" >/dev/null 2>&1; then
     log "ERROR: 配置文件 JSON 异常，跳过本轮健康检查"
+    sleep $((1800 + RANDOM % 1800))
     continue
 fi
 
 if ! systemctl is-active --quiet nftables; then
-    log "ERROR: nftables 服务已停止，尝试重启"
-    systemctl restart nftables 2>/dev/null || log "ERROR: nftables 重启失败"
+    log "WARN: nftables 服务未处于 active，保留当前内核规则并继续检查 Ghost 表"
 fi
 
-if ! nft list table inet filter >/dev/null 2>&1 || ! nft list table inet nat >/dev/null 2>&1; then
+if ! nft list table inet ghost_proxy_filter >/dev/null 2>&1 || ! nft list table inet ghost_proxy_nat >/dev/null 2>&1; then
     log "ERROR: nftables 规则表丢失，尝试重新生成并加载"
-    reload_rules || systemctl restart nftables 2>/dev/null || log "ERROR: nftables 规则恢复失败"
+    reload_rules || systemctl start nftables 2>/dev/null || log "ERROR: nftables 规则恢复失败"
 fi
 
-nat_rules=$(nft list table inet nat 2>/dev/null || true)
+nat_rules=$(nft list table inet ghost_proxy_nat 2>/dev/null || true)
 enabled_ports=$(jq '[.landings[]? | select(.enabled == true) | .ports[]?] | length' "${CONFIG_FILE}" 2>/dev/null || echo 0)
 if ! grep -q "type nat hook prerouting" <<< "${nat_rules}" \
    || ! grep -q "type nat hook postrouting" <<< "${nat_rules}" \
    || { [[ "${enabled_ports}" =~ ^[0-9]+$ && "${enabled_ports}" -gt 0 ]] && ! grep -q "masquerade" <<< "${nat_rules}"; } \
    || { [[ "${enabled_ports}" =~ ^[0-9]+$ && "${enabled_ports}" -gt 0 ]] && ! grep -q "dnat ip to" <<< "${nat_rules}"; }; then
     log "ERROR: nftables 关键 NAT 规则缺失，尝试重新生成并加载"
-    reload_rules || systemctl restart nftables 2>/dev/null || log "ERROR: nftables 关键规则恢复失败"
+    reload_rules || systemctl start nftables 2>/dev/null || log "ERROR: nftables 关键规则恢复失败"
 fi
 
 # 检查所有落地机的存活状态
 landings_count=$(jq '.landings | length' "${CONFIG_FILE}" 2>/dev/null) || {
     log "ERROR: 读取落地机数量失败，跳过本轮健康检查"
+    sleep $((1800 + RANDOM % 1800))
     continue
 }
 if [[ ! "${landings_count}" =~ ^[0-9]+$ ]]; then
     log "ERROR: 落地机数量异常，跳过本轮健康检查"
+    sleep $((1800 + RANDOM % 1800))
     continue
 fi
 
@@ -1194,6 +1258,10 @@ for ((i=0; i<landings_count; i++)); do
     IFS=$'\t' read -r ip enabled name <<< "${landing_line}"
     if [[ -z "${ip}" ]]; then
         log "ERROR: 第 ${i} 个落地机 IP 为空，跳过"
+        continue
+    fi
+
+    if [[ "${DISABLE_ON_ICMP_FAIL:-0}" != "1" && "${enabled}" == "true" ]]; then
         continue
     fi
     
@@ -1259,6 +1327,7 @@ for ((i=0; i<landings_count; i++)); do
 done
 
 # [P2-3] 删除冗余的检查完成日志，减少噪音
+sleep $((1800 + RANDOM % 1800))
 done
 HEALTHEOF
     
@@ -1315,15 +1384,19 @@ uninstall() {
         
         # 不停止/禁用 nftables 服务，避免触发发行版 ExecStop 清空第三方规则。
         # 仅删除本脚本维护的 Ghost-Proxy 表，避免清空第三方 nftables 规则。
-        nft delete table inet filter 2>/dev/null || true
-        nft delete table inet nat 2>/dev/null || true
+        nft delete table inet ghost_proxy_filter 2>/dev/null || true
+        nft delete table inet ghost_proxy_nat 2>/dev/null || true
         
-        # 只删除带 Ghost-Proxy 标记的配置文件，避免误删第三方 nftables 配置。
+        rm -f /etc/nftables.d/ghost-proxy.nft
+
+        # 只删除带 Ghost-Proxy 标记的旧版主配置文件，避免误删第三方 nftables 配置。
         if [[ ! -f /etc/nftables.conf ]]; then
             :
-        elif grep -q "Ghost-Proxy nftables rules" /etc/nftables.conf 2>/dev/null; then
+        elif grep -q "Ghost-Proxy nftables rules" /etc/nftables.conf 2>/dev/null \
+            || grep -q "Ghost-Proxy nftables loader" /etc/nftables.conf 2>/dev/null; then
             rm -f /etc/nftables.conf
         else
+            sed -i '\#^include "/etc/nftables.d/ghost-proxy.nft"$#d; /Ghost-Proxy nftables include/d' /etc/nftables.conf 2>/dev/null || true
             warn "/etc/nftables.conf 未带 Ghost-Proxy 标记，已保留"
         fi
         

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.47"
+VERSION="6.50"
 MODULE_NAME="amneziawg"
 DEFAULT_REPO_URL="https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git"
 # AmneziaWG upstream source refs pinned on 2026-05-20 for reproducible builds.
@@ -103,7 +103,9 @@ detect_platform() {
         warn "推荐基线：Debian 12 Bookworm minimal（当前 Debian 12.14），可显著降低 DKMS 排障成本"
         warn "官方 ISO: https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/"
         warn "网络安装: https://www.debian.org/distrib/netinst"
-        warn "DD 会清空机器。x86_64 可参考 MoeClub InstallNET，ARM64 优先参考 leitbogioro Reinstall；请只在新机并确认救援能力后执行"
+        warn "DD 会清空机器；仅限新机并确认救援能力后手动执行。参考命令："
+        warn "x86_64: bash <(wget --no-check-certificate -qO- 'https://raw.githubusercontent.com/MoeClub/Note/master/InstallNET.sh') -d 12 -v 64 -a -p 'your-ssh-password'"
+        warn "ARM64: bash <(wget --no-check-certificate -qO- 'https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh') Debian 12"
     fi
     [[ "${ID:-}" == "debian" ]] || warn "当前系统不是 Debian，脚本仍将按 Debian 方式尝试安装"
 
@@ -304,7 +306,7 @@ write_ref_state() {
 clone_source() {
     WORK_DIR=$(mktemp -d)
     info "下载 AmneziaWG 内核模块源码: ${AWG_DKMS_REF}"
-    local attempt tarball_url archive extracted
+    local attempt tarball_url archive extracted gitee_tarball
     for attempt in 1 2 3; do
         rm -rf "${WORK_DIR}/src"
         if git clone --depth 1 --config http.lowSpeedLimit=1000 --config http.lowSpeedTime=60 \
@@ -318,12 +320,31 @@ clone_source() {
     done
 
     tarball_url="${TARBALL_URL}"
-    if [[ -z "${tarball_url}" && "${REPO_URL}" == "${DEFAULT_REPO_URL}" ]]; then
+    if [[ -z "${tarball_url}" && ( "${REPO_URL}" == "${DEFAULT_REPO_URL}" || "${GITEE_MIRROR:-0}" == "1" ) ]]; then
         tarball_url="${DEFAULT_TARBALL_URL}"
     fi
     if [[ -n "${tarball_url}" ]]; then
         warn "git clone 不可用，改用源码 tarball 回退下载"
         archive="${WORK_DIR}/src.tar.gz"
+        if [[ "${GITEE_MIRROR:-0}" == "1" && -z "${AWG_DKMS_TARBALL_URL:-}" ]]; then
+            gitee_tarball="https://gitee.com/mirrors/amneziawg-linux-kernel-module/repository/archive/${AWG_DKMS_REF}.tar.gz"
+            for attempt in 1 2; do
+                if curl -fsSL --connect-timeout 10 --retry 2 "${gitee_tarball}" -o "${archive}" \
+                    && mkdir -p "${WORK_DIR}/tar" \
+                    && tar -xzf "${archive}" -C "${WORK_DIR}/tar"; then
+                    extracted=$(find "${WORK_DIR}/tar" -mindepth 1 -maxdepth 1 -type d | head -1 || true)
+                    if [[ -n "${extracted}" && -d "${extracted}" ]]; then
+                        rm -rf "${WORK_DIR}/src"
+                        mv "${extracted}" "${WORK_DIR}/src"
+                        return 0
+                    fi
+                fi
+                rm -rf "${WORK_DIR}/tar" "${archive}"
+                warn "Gitee tarball 下载失败（尝试 ${attempt}/2）"
+                [[ ${attempt} -lt 2 ]] && sleep 3
+            done
+            warn "Gitee tarball 失败，回退 GitHub tarball"
+        fi
         for attempt in 1 2 3; do
             if curl -fsSL --connect-timeout 10 --retry 3 "${tarball_url}" -o "${archive}" \
                 && mkdir -p "${WORK_DIR}/tar" \
@@ -487,9 +508,43 @@ ensure_health_service() {
         install -m 0755 "${BASH_SOURCE[0]}" /usr/local/bin/install_amneziawg_dkms.sh 2>/dev/null || true
     elif command -v curl >/dev/null 2>&1; then
         curl -fsSL --connect-timeout 10 --retry 3 \
-            https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms.sh \
+            "https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms_v${VERSION}.sh" \
             -o /usr/local/bin/install_amneziawg_dkms.sh 2>/dev/null && chmod +x /usr/local/bin/install_amneziawg_dkms.sh || true
     fi
+    cat > /usr/local/bin/awg-dkms-health.sh <<'EOF'
+#!/usr/bin/env bash
+set -u
+
+module_name="${MODULE_NAME:-amneziawg}"
+ref_state="/var/lib/amneziawg-dkms/ref"
+ref="$(cat "${ref_state}" 2>/dev/null || true)"
+kver="$(uname -r)"
+
+if modprobe "${module_name}" 2>/dev/null && [[ -n "${ref}" ]] && grep -qx "${ref}" "${ref_state}" 2>/dev/null; then
+    exit 0
+fi
+
+if [[ ! -f "/lib/modules/${kver}/build/Makefile" ]]; then
+    echo "SKIP: no complete kernel headers for ${kver}" >&2
+    exit 0
+fi
+
+if [[ ! -x /usr/local/bin/install_amneziawg_dkms.sh ]]; then
+    echo "SKIP: /usr/local/bin/install_amneziawg_dkms.sh is missing" >&2
+    exit 0
+fi
+
+for i in 1 2 3; do
+    FORCE_REINSTALL=1 AWG_DKMS_REF="${ref:-${AWG_DKMS_REF:-}}" AWG_TOOLS_REF="${AWG_TOOLS_REF:-}" \
+        /usr/local/bin/install_amneziawg_dkms.sh && exit 0
+    sleep 30
+done
+
+echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2
+exit 1
+EOF
+    chmod +x /usr/local/bin/awg-dkms-health.sh
+
     cat > /etc/systemd/system/ghost-awg-dkms-check.service <<EOF
 [Unit]
 Description=AmneziaWG DKMS Module Health Check
@@ -499,7 +554,9 @@ After=network.target
 Type=oneshot
 Environment=DKMS_VERSION=${DKMS_VERSION}
 Environment=GCC_VERSION=${GCC_VERSION}
-ExecStart=/bin/bash -c 'kver="\$(uname -r)"; modprobe ${MODULE_NAME} 2>/dev/null && exit 0; test -f "/lib/modules/\${kver}/build/Makefile" || { echo "SKIP: no complete kernel headers for \${kver}" >&2; exit 0; }; for i in 1 2 3; do FORCE_REINSTALL=1 /usr/local/bin/install_amneziawg_dkms.sh && exit 0; sleep 30; done; echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2; exit 1'
+Environment=AWG_DKMS_REF=${AWG_DKMS_REF}
+Environment=AWG_TOOLS_REF=${AWG_TOOLS_REF}
+ExecStart=/usr/local/bin/awg-dkms-health.sh
 RemainAfterExit=yes
 
 [Install]
@@ -527,6 +584,11 @@ print_result() {
     echo "arch=$(uname -m)"
     echo "awg_dkms_ref=${AWG_DKMS_REF}"
     echo "awg_tools_ref=${AWG_TOOLS_REF}"
+    if grep -qx "${AWG_DKMS_REF}" "${REF_STATE_FILE}" 2>/dev/null; then
+        echo "ref_matched=true"
+    else
+        echo "ref_matched=false"
+    fi
     modinfo "${MODULE_NAME}" | awk -F: '/^(filename|version|vermagic):/ {gsub(/^[ \t]+/, "", $2); print $1"="$2}'
     echo "======================================="
     echo "稳定建议：生产机器不要主动 dist-upgrade 或更换内核；如需冻结内核元包，可手动执行："
