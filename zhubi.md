@@ -46,6 +46,16 @@
 **核心修复：**
 v6.26 移除混淆参数是负优化，违背"欺上瞒下"核心诉求。v6.27 通过 DKMS 编译真正的 AmneziaWG 内核模块，恢复混淆能力。优雅降级：DKMS 失败 → amneziawg-go 用户态 → 标准 WireGuard（最后手段）。
 
+### 主笔 AI 独立 DKMS 脚本补充
+
+- ✅ 新增独立脚本 `install_amneziawg_dkms_v6.27.sh`，不集成到中转机或落地机脚本。
+- ✅ 支持 Debian 12 x86_64 与 ARM64，适配 1核1G x86 VPS 和甲骨文 ARM VPS。
+- ✅ 安装 DKMS、编译工具和内核 headers；当前 headers 不可用时回退架构通用 headers。
+- ✅ 低内存且无 swap 时临时创建 1G swap，降低 DKMS 编译 OOM 风险，默认编译后清理。
+- ✅ 编译安装后执行 `modprobe amneziawg` 与 `modinfo amneziawg` 验证。
+- ✅ 保持独立调用方式，供后续安装脚本在需要时显式调用。
+- ✅ 增加 `.gitattributes`，强制 `.sh` 使用 LF，避免 Debian 运行时出现 CRLF 解析错误。
+
 ---
 
 ## v6.26 版本 (2026-05-12)
