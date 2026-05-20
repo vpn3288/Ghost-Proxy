@@ -1,5 +1,20 @@
 # Ghost-Proxy 审核记录
 
+# v6.37 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.37.sh`、`install_transit_v6.37.sh`、`install_amneziawg_dkms_v6.37.sh`，并同步稳定入口到 v6.37。
+- ✅ 落地机恢复同目录当前版本 DKMS 脚本搜索；已有内核模块但缺少 `awg/awg-quick` 时改为调用独立 DKMS 脚本补装工具，保留 `amneziawg-go` 混淆回退。
+- ✅ 落地机 Base64 导入块改为安装完成时直接打印，`show-clash-config` 恢复 `/bin/cat`，不恢复 HTTP 订阅。
+- ✅ 落地机端口占用检测改为 `ss sport` 精确检测；中转机专属 AWG/SS/ICMP 防火墙规则改为先删旧规则再追加，避免重复堆积并保持公网兜底 DROP。
+- ✅ 落地机 `awg-landing.service` 保活循环去掉无意义 PPID 判断；MTU 探测失败时明确告警并继续使用默认值。
+- ✅ 中转机健康检查脚本去掉 `set -e`，为 `jq/nc/systemctl` 增加容错，避免临时故障导致守护进程 crash loop。
+- ✅ 中转机非交互安装末尾仅在 TTY 下询问连通性测试，避免 `curl | bash` 或环境变量部署被 `read` 阻塞。
+- ✅ 中转机端口占用检测和 `ghost-transit-ctl add-landing` 统一改为 `ss sport` 精确检测；健康检查提示同步为 15-20 分钟。
+- ✅ DKMS 健康检查 service 在 `modprobe` 失败后最多重试 3 次强制重装，失败后明确退出等待下次触发，避免无限重试噪音。
+- ✅ 精简落地机已废弃功能的残留说明；继续保持不恢复标准 WireGuard 回退、不恢复 HTTP 订阅、不在中转机加入应用层代理、不删除 IPv6 禁用。
+
 # v6.36 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
