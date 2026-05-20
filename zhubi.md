@@ -1,5 +1,22 @@
 # Ghost-Proxy 审核记录
 
+# v6.53 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.53.sh`、`install_transit_v6.53.sh`、`install_amneziawg_dkms_v6.53.sh`，并同步稳定入口到 v6.53。
+- ✅ 修复 P1：`AUTO_INSTALL=1` 时 `LANDING_INDEX` 不再静默默认 1，必须显式传入，避免多落地机无人值守部署端口撞车。
+- ✅ 修复 P1：中转机重跑检测到既有 `landings` 且未传入 `LANDING_LIST/LANDING_IP` 时默认保留并跳过新增，只更新管理工具和 nftables 规则。
+- ✅ 修复 P1：中转机依赖安装增加 3 次重试；`ghost-transit-ctl status` 增加 Ghost filter/nat 表、关键规则数和规则文件更新时间。
+- ✅ 修复 P1：落地机依赖显式安装 `iproute2`；`SS_PASSWORD` 校验放宽到常见 JSON/YAML 安全标点；`install_amneziawg_go()` 结束恢复目录失败时只警告并切到 `/`。
+- ✅ 修复 P1：落地健康检查加入 `AWG_STABLE_WINDOW` 稳定窗口，AWG 恢复后连续稳定才清零失败计数，窗口期抖动不立即触发下一轮重启。
+- ✅ 修复 P1/P2：DKMS 低内存临时 swap 创建失败时明确警告，调用方继续回退 `amneziawg-go`；中转健康检查 NAT 异常日志打印 prerouting/postrouting 摘要。
+- ✅ 新增 `dd_debian.sh`：只生成 Debian 12.14/ARM64 Debian 12 DD 命令，默认不执行；`--execute` 必须倒计时和二次确认。
+- ✅ 新增 `verify_installation.sh`：支持 `landing/transit` 安装后验证；README 和安装完成提示补充验证命令。
+- ✅ 新增 `.github/workflows/build-awg.yml`：用于构建 amd64/arm64 预编译用户态 `amneziawg-go` + `awg-tools` Release artifacts。
+- ✅ 新增 `docs/alternative-solutions.md`：采纳预编译用户态和 DD 辅助；AWG-only 仅作为后续独立备用；继续驳回预编译 `.ko`、HTTP 订阅、中转应用层代理和标准 WireGuard 回退。
+- ⚖️ 评判：`install_amneziawg_dkms.sh` 继续保持跨架构通用；落地机下载 DKMS 脚本时预留未来架构后缀回退，但本轮不制造不存在的架构分裂脚本。
+- ⏳ 暂缓：`versions.conf` 仍不填写预编译 URL/SHA256；必须等 GitHub Releases 真实产物发布并核对校验后再填。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.53.sh`、`install_transit_v6.53.sh`、`install_amneziawg_dkms_v6.53.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.52 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.52.sh`、`install_transit_v6.52.sh`、`install_amneziawg_dkms_v6.52.sh`，并同步稳定入口到 v6.52。

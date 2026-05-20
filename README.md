@@ -6,27 +6,24 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.51`
+当前稳定版本：`v6.53`
 
 仓库保留稳定入口和最近审查版本快照。旧版本仅用于回溯，默认使用无版本后缀的稳定入口。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.51
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.51
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.51
-install_transit_v6.51.sh        # v6.51 中转机版本快照
-install_landing_v6.51.sh        # v6.51 落地机版本快照
-install_amneziawg_dkms_v6.51.sh # v6.51 DKMS 版本快照
-install_transit_v6.50.sh        # v6.50 上一个审查版本快照
-install_landing_v6.50.sh        # v6.50 上一个审查版本快照
-install_amneziawg_dkms_v6.50.sh # v6.50 上一个审查版本快照
-install_transit_v6.49.sh        # v6.49 历史审查版本快照
-install_landing_v6.49.sh        # v6.49 历史审查版本快照
-install_amneziawg_dkms_v6.49.sh # v6.49 历史审查版本快照
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.53
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.53
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.53
+install_transit_v6.53.sh        # v6.53 中转机版本快照
+install_landing_v6.53.sh        # v6.53 落地机版本快照
+install_amneziawg_dkms_v6.53.sh # v6.53 DKMS 版本快照
+dd_debian.sh                    # Debian 12.14 DD 辅助命令生成器，默认不执行
+verify_installation.sh          # 安装后验证脚本
 versions.conf                   # 依赖和上游源码 ref 固定配置
 zhubi.md                        # 主笔修复记录
+docs/alternative-solutions.md   # 备用方案评判
 ```
 
 ## 推荐系统基线
@@ -50,6 +47,12 @@ ARM64 备用 DD 脚本示例（leitbogioro）：
 ```bash
 bash <(wget --no-check-certificate -qO- 'https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh') \
   Debian 12
+```
+
+也可以使用仓库内辅助脚本生成命令。默认只打印，不会执行清盘：
+
+```bash
+bash dd_debian.sh --password 'your-ssh-password' --arch amd64 --port 22
 ```
 
 生产机器建议避免主动 `dist-upgrade` 或更换内核；如追求极稳，可在理解安全更新影响后按架构手动冻结内核元包：
@@ -96,6 +99,22 @@ bash install_landing.sh
 可固定字段：`DKMS_VERSION`、`GCC_VERSION`、`SINGBOX_VERSION`、`AWG_DKMS_REF`、`AWG_TOOLS_REF`、`AWG_GO_REF`。留空表示使用系统仓库或上游默认版本。
 
 可选预编译用户态兜底字段：`PREBUILT_AWG_GO_URL_x86_64`、`PREBUILT_AWG_GO_SHA256_x86_64`、`PREBUILT_AWG_TOOLS_URL_x86_64`、`PREBUILT_AWG_TOOLS_SHA256_x86_64`、`PREBUILT_AWG_GO_URL_arm64`、`PREBUILT_AWG_GO_SHA256_arm64`、`PREBUILT_AWG_TOOLS_URL_arm64`、`PREBUILT_AWG_TOOLS_SHA256_arm64`。未发布 Release 资产前保持留空，脚本会自动回退源码编译。
+
+仓库包含 `.github/workflows/build-awg.yml`，可手动触发或在 tag 发布时构建 amd64/arm64 用户态产物。Release 产物真实发布并核对 SHA256 后，再填入 `versions.conf`。
+
+## 安装后验证
+
+落地机：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/verify_installation.sh | bash -s landing
+```
+
+中转机：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/verify_installation.sh | bash -s transit
+```
 
 ## 卸载
 
