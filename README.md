@@ -8,7 +8,23 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 
 当前稳定版本：`v6.46`
 
-仓库保留稳定入口和最近审查版本：`v6.37`、`v6.38`、`v6.39`、`v6.40`、`v6.41`、`v6.42`、`v6.43`、`v6.44`、`v6.45`、`v6.46`。更早版本已清理，避免误用旧脚本。
+仓库保留稳定入口和最近两个审查版本：`v6.45`、`v6.46`。`v6.45` 以前的历史脚本已清理，避免误用旧版本。
+
+## 项目结构
+
+```text
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.46
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.46
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.46
+install_transit_v6.46.sh        # v6.46 中转机版本快照
+install_landing_v6.46.sh        # v6.46 落地机版本快照
+install_amneziawg_dkms_v6.46.sh # v6.46 DKMS 版本快照
+install_transit_v6.45.sh        # v6.45 中转机版本快照
+install_landing_v6.45.sh        # v6.45 落地机版本快照
+install_amneziawg_dkms_v6.45.sh # v6.45 DKMS 版本快照
+versions.conf                   # 依赖和上游源码 ref 固定配置
+zhubi.md                        # 主笔修复记录
+```
 
 ## 推荐系统基线
 
