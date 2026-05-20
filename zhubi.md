@@ -1,5 +1,16 @@
 # Ghost-Proxy 审核记录
 
+# v6.41 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.41.sh`、`install_transit_v6.41.sh`、`install_amneziawg_dkms_v6.41.sh`，并同步稳定入口到 v6.41。
+- ✅ 落地机非交互模式新增 `LANDING_INDEX`，默认中转端口按落地序号错开：AWG `51820+n-1`、SS `8389+n-1`，避免单中转多落地端口冲突。
+- ✅ 中转机连通性测试和健康检查彻底移除 `nc` TCP 探测，仅使用宽松 ICMP；健康检查改为 30-60 分钟随机循环，默认只记录 ICMP 失败，不自动摘除落地机，只有 `DISABLE_ON_ICMP_FAIL=1` 时连续 5 次失败才禁用。
+- ✅ DKMS 内核符号预检改为软告警，默认继续尝试 DKMS 编译；如需严格阻断可设置 `STRICT_KERNEL_SYMBOL_CHECK=1`。
+- ✅ 落地机 MTU 探测仅在变化超过 50 时重启 AWG，重启失败自动回退旧 MTU，不再中断安装。
+- ✅ 客户端 Clash Meta YAML 删除本地 `0.0.0.0:53` DNS 监听块，避免与 systemd-resolved 等本机 DNS 服务冲突；Base64 一键导入保留。
+- ✅ `LOCK_DNS` 改为兼容别名，推荐使用 `APPEND_PUBLIC_DNS=1` 表达真实行为：只追加公共 DNS，不锁定 `/etc/resolv.conf`。
+- ✅ 删除落地机 Docker IPv6 放行规则；IPv6 仍按要求通过 sysctl + ip6tables 默认禁用。SS Brutal 继续显式关闭，优先保证链式代理客户端兼容性和流量形态稳定。
+
 # v6.40 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
