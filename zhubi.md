@@ -1,5 +1,17 @@
 # Ghost-Proxy 审核记录
 
+# v6.44 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.44.sh`、`install_transit_v6.44.sh`、`install_amneziawg_dkms_v6.44.sh`，并同步稳定入口到 v6.44。
+- ✅ 采纳 P1：AWG 新混淆参数改为推荐范围生成，`JC=4-12`、`JMIN=8`、`JMAX=80`、`S1/S2>0` 且避开冲突，`H1-H4` 保持正整数且唯一；旧版不安全参数会重写。
+- ✅ 采纳 P1：MTU 默认保持保守值 1360，不再对本机隧道地址做伪智能探测；仅 `AUTO_DETECT_MTU=1` 时对中转公网 IP 探测，并限制结果在 1280-1420。
+- ✅ 采纳 P1：落地机备轨健康检查改为 `ss` 监听检测；交互端口冲突检测同时检查 TCP/UDP；安装完成提示改为无序号列表。
+- ✅ 采纳 P1：DKMS 增加 `build/Makefile` 完整性检查；固定 GCC 安装失败但系统已有 `gcc` 时继续尝试，避免镜像版本差异误伤。
+- ✅ 采纳 P1/P2：中转机健康检查验证关键 NAT hook、DNAT 与 masquerade 规则；`ghost-transit-ctl add-landing` 增加重复 IP 拦截、临时文件校验和 `chmod 600`。
+- ✅ README 补充 v6.44、DD 来源和 x86_64/ARM64 区分。
+- ❌ 驳回：Hysteria2 作为默认或自动备轨暂不采用；它会在中转机引入应用层代理，不符合当前低暴露红线。可作为独立备用方案另行设计，不并入默认脚本。
+- ❌ 暂缓：`SS-only` / `AWG-only` 档位本轮不加，避免扩大测试面；当前优先稳定 DKMS -> amneziawg-go 主方案。
+
 # v6.43 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.43.sh`、`install_transit_v6.43.sh`、`install_amneziawg_dkms_v6.43.sh`，并同步稳定入口到 v6.43。
