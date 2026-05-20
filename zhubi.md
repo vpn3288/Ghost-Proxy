@@ -1,5 +1,16 @@
 # Ghost-Proxy 审核记录
 
+# v6.52 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.52.sh`、`install_transit_v6.52.sh`、`install_amneziawg_dkms_v6.52.sh`，并同步稳定入口到 v6.52。
+- ✅ 修复 P0：中转机 `init_config()` 重跑时只更新 `version/ssh_port`，不再清空既有 `landings`。
+- ✅ 修复 P1：`versions.conf` 默认只读取脚本同目录；如需读取当前目录必须显式设置 `ALLOW_CWD_VERSIONS=1` 并打印提示。
+- ✅ 修复 P1：`awg-tools` 增加 `/var/lib/amneziawg-tools/ref`，复用 `awg/awg-quick` 前校验 `AWG_TOOLS_REF`，不匹配则重装。
+- ✅ 修复 P1：`sing-box 1.11.0` 增加 amd64/arm64 SHA256 固定校验，下载后校验失败即退出。
+- ✅ 修复 P1/P2：落地健康检查优先用 `systemctl show` 检测 `amneziawg-go` 后端；完全卸载时对含密码配置先 `shred`；中转磁盘预检阈值降为 100MB 并修正备份 glob 引用。
+- ❌ 驳回：不把预编译 `.ko` 放入项目；内核模块强绑定 kernel/vermagic，风险高于收益。备用方案继续走“预编译用户态 `amneziawg-go` + `awg-tools` + SHA256”路径。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.52.sh`、`install_transit_v6.52.sh`、`install_amneziawg_dkms_v6.52.sh` 均通过。
+
 # v6.51 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.51.sh`、`install_transit_v6.51.sh`、`install_amneziawg_dkms_v6.51.sh`，并同步稳定入口到 v6.51。
