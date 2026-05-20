@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.57 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.57.sh`、`install_transit_v6.57.sh`、`install_amneziawg_dkms_v6.57.sh`，并同步稳定入口到 v6.57。
+- ✅ 修复 P1/P2：中转机健康检查安装摘要改为真实节奏“首次 60-180 秒，之后 5-10 分钟”，避免继续显示旧的 30-60 分钟。
+- ✅ 修复 P2：`SKIP_CONNECTIVITY_TEST=1` 才跳过中转连通性测试；非交互模式默认执行一次落地机连通性测试，便于自动化安装发现云防火墙阻断。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.57.sh`、`install_transit_v6.57.sh`、`install_amneziawg_dkms_v6.57.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.56 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.56.sh`、`install_transit_v6.56.sh`、`install_amneziawg_dkms_v6.56.sh`，并同步稳定入口到 v6.56。
