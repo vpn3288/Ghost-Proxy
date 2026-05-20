@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.58"
+VERSION="6.59"
 
 usage() {
     cat <<EOF

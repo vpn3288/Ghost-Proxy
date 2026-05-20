@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.59 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.59.sh`、`install_transit_v6.59.sh`、`install_amneziawg_dkms_v6.59.sh`，并同步稳定入口到 v6.59。
+- ✅ 修复 P0：落地机重跑时 `AUTO_INSTALL` 参数错误不再先临停旧服务；`LANDING_INDEX` 和端口类变量提前做纯校验。
+- ✅ 修复 P0：如果重跑已临停旧服务但后续安装失败，退出 trap 会尝试恢复 `awg-landing/ss-main/ss-backup/landing-health-check`，避免错误输入导致可用服务下线。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.59.sh`、`install_transit_v6.59.sh`、`install_amneziawg_dkms_v6.59.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.58 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.58.sh`、`install_transit_v6.58.sh`、`install_amneziawg_dkms_v6.58.sh`，并同步稳定入口到 v6.58。
