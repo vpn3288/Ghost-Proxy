@@ -1,5 +1,20 @@
 # Ghost-Proxy 审核记录
 
+## v6.30 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.30.sh`：删除标准 WireGuard 最终回退；DKMS 失败后只允许真实 `amneziawg-go` 用户态后端，保留 `awg/awg-quick` 工具。
+- ✅ 落地机 DKMS 脚本不再硬编码 `/root`：按环境变量、脚本同目录、`/root`、`/usr/local/bin`、`/tmp` 搜索，找不到再从 GitHub 下载。
+- ✅ 落地机将 `TRANSIT_AWG_LISTEN_PORT` / `TRANSIT_SS_LISTEN_PORT` 与本机目标端口分离，客户端 YAML 使用中转监听端口，适配单中转多落地机复制粘贴导入。
+- ✅ 落地机 Base64 导入文件改为纯 Base64，不再把 `COPY_START/END` 标记写入文件；删除旧 v5.3 Peer 公钥提示，避免误导。
+- ✅ 落地机安装依赖后再生成混淆参数；服务端 MTU 使用自动探测值；`awg-landing.service` 加持续监控循环，并新增轻量健康检查。
+- ✅ 新增 `install_transit_v6.30.sh`：安装阶段复用 `ghost-transit-ctl reload-rules` 原子生成 nftables 规则，删除重复生成逻辑。
+- ✅ 中转机健康检查改为两级检测（SSH 存活 + 备轨代理端口可达），并检查/重启 nftables；cron 日志写入 `/var/log/ghost-transit-health.log`。
+- ✅ 中转机 sysctl 调整：`tcp_fastopen=1`、`tcp_mtu_probing=0`；非法访问 nft 日志降为 `level info`。
+- ✅ 新增 `install_amneziawg_dkms_v6.30.sh`，并同步稳定入口 `install_amneziawg_dkms.sh`：`apt-get update` 和 `git clone` 增加重试/低速保护，增加 `dpkg --configure -a`、磁盘空间检查、`lsmod` 验证、`awg-quick` 检查、systemd swap 清理 timer 与 DKMS 启动健康服务。
+- ✅ 已执行 `bash -n`：`install_landing_v6.30.sh`、`install_transit_v6.30.sh`、`install_amneziawg_dkms_v6.30.sh`、`install_amneziawg_dkms.sh` 均通过。
+
 ## v6.29 / v6.28 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
