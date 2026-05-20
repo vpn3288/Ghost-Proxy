@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.61 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.61.sh`、`install_transit_v6.61.sh`、`install_amneziawg_dkms_v6.61.sh`，并同步稳定入口到 v6.61。
+- ✅ 修复 P0：落地机内核后端增加 `/usr/local/bin/awg-landing-prestart.sh`，启动前先 `modprobe amneziawg`；若当前内核缺少模块，则调用独立 DKMS 脚本补构建当前内核后再加载。
+- ✅ 修复 P1：`install_amneziawg_dkms.sh` 读取 `/etc/os-release` 不再覆盖脚本 `VERSION`，DKMS 成功摘要的 `script_version` 恢复为脚本版本号。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.61.sh`、`install_transit_v6.61.sh`、`install_amneziawg_dkms_v6.61.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.60 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.60.sh`、`install_transit_v6.60.sh`、`install_amneziawg_dkms_v6.60.sh`，并同步稳定入口到 v6.60。
