@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.56 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.56.sh`、`install_transit_v6.56.sh`、`install_amneziawg_dkms_v6.56.sh`，并同步稳定入口到 v6.56。
+- ✅ 修复 P0：中转机 `ghost-transit-ctl reload-rules` 不再使用当前 nft 不兼容的 `destroy table inet ...`；仅在 Ghost 表已存在时生成 `delete table`，初次安装可直接加载规则。
+- ✅ 保持中转机纯 nftables 架构，不清空第三方 ruleset，不引入任何应用层代理。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.56.sh`、`install_transit_v6.56.sh`、`install_amneziawg_dkms_v6.56.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.55 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.55.sh`、`install_transit_v6.55.sh`、`install_amneziawg_dkms_v6.55.sh`，并同步稳定入口到 v6.55。
