@@ -1,5 +1,21 @@
 # Ghost-Proxy 审核记录
 
+# v6.39 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.39.sh`、`install_transit_v6.39.sh`、`install_amneziawg_dkms_v6.39.sh`，并同步稳定入口到 v6.39。
+- ✅ DKMS 独立脚本在当前/架构内核头安装后仍不匹配时改为 `warn + return 1`，让落地机脚本明确回退到 `amneziawg-go`，避免甲骨文 ARM UEK 场景被误读为全局安装崩溃。
+- ✅ DKMS 新增 `/etc/kernel/postinst.d/amneziawg-dkms`，内核升级后自动触发 `ghost-awg-dkms-check.service` 自愈重编译验证。
+- ✅ 落地机 Clash Meta/Mihomo 导入配置修复：AWG 混淆字段移动到 `amnezia-wg-option`，补齐 `allowed-ips`，H1-H4 改为十进制 uint32；旧 hex 参数会自动重写为十进制。
+- ✅ 落地机步骤计数统一为 11/11；交互安装补查 AWG UDP 端口占用；非交互模式补齐 `TRANSIT_IP / TRANSIT_AWG_LISTEN_PORT / TRANSIT_SS_LISTEN_PORT` 完整性提示。
+- ✅ 落地机启动顺序改为先写防火墙再启动服务，避免 `ss-backup` 安装瞬间公网暴露；`awg-landing.service` 保活逻辑抽到 `/usr/local/bin/awg-landing-monitor.sh`。
+- ✅ 落地机健康检查加入 AWG/SS 连续失败计数、冷却和重启后验证；AWG 重启前尝试 `modprobe amneziawg`，内核模块缺失时日志更清晰。
+- ✅ 落地机完全卸载按 `metadata.json` 实际端口清理防火墙，并清理 AmneziaWG DKMS 模块、DKMS 自愈服务、swap 清理 timer 和 kernel postinst hook。
+- ✅ 中转机 `ghost-transit-ctl reload-rules` 改为临时规则先语法验证并实际加载成功后才替换 `/etc/nftables.conf`，失败时保留旧规则文件。
+- ✅ 中转机健康检查增加 nftables 规则表验证，规则丢失时自动 `reload-rules` 或重启 nftables；删除未调用的 `install_package_with_retry()`、顶层 `add_port()` 和 jq 死代码 `def forward_ports`。
+- ✅ 保持不恢复标准 WireGuard、不恢复 HTTP 订阅、不在中转机安装应用层代理、不删除 IPv6 禁用、不删除 DKMS 独立脚本和 `amneziawg-go` 混淆回退。
+
 # v6.38 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
