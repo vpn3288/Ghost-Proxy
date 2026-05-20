@@ -1,5 +1,11 @@
 # Ghost-Proxy 审核记录
 
+# v6.63 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.63.sh`、`install_transit_v6.63.sh`、`install_amneziawg_dkms_v6.63.sh`，并同步稳定入口到 v6.63。
+- ✅ 实机审计修复：`clash-meta-import-block.txt` 和 `clash-meta-subscription.txt` 含客户端私钥与 SS 密码，权限由默认 `644` 收紧为 `600`；保留本地终端复制和文件读取导入方式，不新增 HTTP 订阅。
+- ✅ 低暴露审计：中转机未发现 Nginx/Gost/Xray/Haproxy/sing-box/Caddy/Trojan/V2Ray 进程或包，80/443/8080/8443 未监听；验证 0 失败 0 警告。
+
 # v6.62 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.62.sh`、`install_transit_v6.62.sh`、`install_amneziawg_dkms_v6.62.sh`，并同步稳定入口到 v6.62。
