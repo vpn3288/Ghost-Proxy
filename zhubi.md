@@ -1,5 +1,20 @@
 # Ghost-Proxy 审核记录
 
+## v6.31 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_amneziawg_dkms_v6.31.sh`，并同步稳定入口 `install_amneziawg_dkms.sh`：DKMS 成功后必须确认 `awg/awg-quick`，缺失时编译安装 `amneziawg-tools`，不再用 `wireguard-tools` 冒充。
+- ✅ 新增 `install_landing_v6.31.sh`：`awg-landing.service` 使用 `command -v awg-quick` 的真实路径，启动等待 `10.8.0.1` 就绪后再进入保活循环，避免 systemd crash loop。
+- ✅ 落地机健康检查改为 systemd 自循环，随机 4-6 分钟间隔；主轨检查使用 `${SS_MAIN_PORT}`，不再硬编码 `8388`。
+- ✅ 落地机交互式中转监听端口改为输错可重输；防火墙插入规则不再使用固定编号，降低与 Docker/1Panel 规则冲突风险。
+- ✅ 落地机与中转机均将 `net.ipv6.conf.lo.disable_ipv6` 改为 `1`，满足完全禁用 IPv6 的要求。
+- ✅ 新增 `install_transit_v6.31.sh`：中转健康检查优先探测备轨 TCP 代理端口，只有没有代理端口时才回退 SSH；检查节拍改为 systemd 随机 4-6 分钟自循环。
+- ✅ 中转机 sysctl 精简为 IP 转发、IPv6 禁用、fq/BBR、`tcp_slow_start_after_idle=0`；删除 TFO、大 TCP buffer 与激进 conntrack 参数。
+- ✅ 中转机补齐 `--help`，新增 `LANDING_LIST` 多落地机非交互导入；非法访问 nft 日志改为 `level warn`。
+- ✅ 客户端 YAML 明确提示 AWG 混淆字段仅 Mihomo(原 Clash Meta) 支持，避免用户误以为所有 Clash 客户端都有混淆。
+- ✅ 已执行 `bash -n`：`install_landing_v6.31.sh`、`install_transit_v6.31.sh`、`install_amneziawg_dkms_v6.31.sh`、`install_amneziawg_dkms.sh` 均通过。
+
 ## v6.30 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
