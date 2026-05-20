@@ -6,9 +6,9 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.39`
+当前稳定版本：`v6.40`
 
-仓库只保留稳定入口和最近审查版本：`v6.37`、`v6.38`、`v6.39`。更早版本已清理，避免误用旧脚本。
+仓库保留稳定入口和最近审查版本：`v6.37`、`v6.38`、`v6.39`、`v6.40`。更早版本已清理，避免误用旧脚本。
 
 ## 安装
 
@@ -46,7 +46,7 @@ bash install_landing.sh --uninstall
 
 ## 关键说明
 
-- 不提供 HTTP 订阅服务；落地机安装完成后直接输出 YAML 和 Base64 导入块。
+- 不提供 HTTP 订阅服务；落地机安装完成后默认只输出 Base64 导入块，完整 YAML 保存在本机文件。
 - AmneziaWG DKMS 失败时，落地机脚本会回退到支持混淆的 `amneziawg-go`。
 - 不回退到无混淆的标准 WireGuard。
 - 中转机不安装应用层代理，只负责端口转发。

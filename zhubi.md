@@ -1,5 +1,22 @@
 # Ghost-Proxy 审核记录
 
+# v6.40 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.40.sh`、`install_transit_v6.40.sh`、`install_amneziawg_dkms_v6.40.sh`，并同步稳定入口到 v6.40。
+- ✅ 落地机 `LOCK_DNS=1` 不再停止 `systemd-resolved`、不删除或锁定 `/etc/resolv.conf`，改为 5 秒警告后追加公共 DNS，避免破坏 1Panel 证书申请和 Docker DNS。
+- ✅ 落地机 IPv6 禁用验证精简为 `sysctl + ip6tables` 结果输出；保留 IPv6 全局禁用和 ip6tables DROP。
+- ✅ 落地机 SS JSON 显式写入 `multiplex.brutal.enabled=false`；防火墙补充 Docker `ip6tables` 兼容规则。
+- ✅ 落地机非交互模式只要求 `TRANSIT_IP`，未设置中转监听端口时自动使用 `AWG_PORT / SS_BACKUP_PORT`；增加 `HOME_IFACE + HOME_IP` 手动家宽网卡指定。
+- ✅ 落地机健康检查节奏改为 10-30 分钟随机；安装完成默认只打印 Base64 一键导入块，完整 YAML 保存在文件，需 `PRINT_FULL_YAML=1` 才打印。
+- ✅ 落地机卸载移除硬编码端口回退，并继续扫描旧版 `PORTSCAN_*` 链及 `ghost/landing` 残留链，减少自定义端口残留。
+- ✅ 中转机 `init_config()` 默认复用既有多落地机配置，仅 `RESET_CONFIG=1` 时清空，避免重跑脚本丢失 `landings[]`。
+- ✅ 中转机交互端口冲突时改为循环重输，不再直接中断安装。
+- ✅ 中转机健康检查取消 `nc` TCP 端口探测，改为 20-40 分钟随机 ICMP 存活判断，并继续验证 nftables 表丢失自愈；保持中转机纯 nftables，不安装应用层代理或 AWG 客户端。
+- ✅ DKMS 独立脚本 `install_packages` 失败明确 `exit 1` 交给落地机回退，并新增内核符号预检告警退出，避免伪装成模块安装成功。
+- ✅ 保持不恢复标准 WireGuard、不恢复 HTTP 订阅、不在中转机安装应用层代理、不删除 Base64 导入、不删除 AmneziaWG DKMS 与 `amneziawg-go` 回退。
+
 # v6.39 仓库维护 (2026-05-20)
 
 ### 主笔 AI 本轮维护
