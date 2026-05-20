@@ -1,5 +1,23 @@
 # Ghost-Proxy 审核记录
 
+# v6.35 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.35.sh`、`install_transit_v6.35.sh`、`install_amneziawg_dkms_v6.35.sh`，并同步稳定入口 `install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh` 到 v6.35。
+- ✅ 落地机非交互模式补齐 `AWG_PORT` UDP 占用检测，`SS_BACKUP_PORT` 改为 TCP 精确检测；交互模式端口占用时用户拒绝重选则明确停止安装，不再带错继续。
+- ✅ 落地机防火墙在允许中转机访问 AWG/SS 后追加公网兜底 DROP，不改变全局默认策略，不破坏 Docker/1Panel，但真正锁死代理端口只给中转机。
+- ✅ 落地机 DKMS 稳定入口改为 `/usr/local/bin/install_amneziawg_dkms.sh` 优先，下载失败只告警并继续本地脚本或 `amneziawg-go` 混淆回退。
+- ✅ 落地机 `awg-landing.service` 保活循环改为 5 秒检查并感知父进程退出；隧道确认成功后等待 2 秒再做 MTU 探测，避免刚建链路时过早探测。
+- ✅ 删除落地机未调用的 `detect_optimal_mtu()` 死代码，保留更可靠的隧道内 MTU 探测。
+- ✅ 落地机终端 Base64 输出精简为读取命令，完整 Base64 仍保存在 `${CONFIG_DIR}/clash-meta-import-block.txt`，复制粘贴导入能力不变。
+- ✅ 中转机 `check_port_conflict()` 按 TCP/UDP 分别检测，避免 UDP 占用误报 TCP 或 TCP 占用误报 UDP。
+- ✅ 中转机安装连通性测试与健康检查改为遍历每台落地机全部 TCP 目标端口，任一代理端口可达即判定存活，再回退 SSH。
+- ✅ 中转机 nftables input 链非法访问默认纯 drop，减少长期无人值守日志噪音；forward 链补充 ICMP echo-request 转发，便于排障。
+- ✅ 中转机健康检查间隔改为 10-15 分钟，降低长期运行日志与 CPU 噪音。
+- ✅ DKMS 独立脚本 swap 清理 service 使用固定路径 `/var/tmp/amneziawg-dkms-build.swap`，避免 systemd 中变量为空。
+- ✅ 保持不恢复标准 WireGuard 回退、不删除 AWG DKMS 独立脚本、不删除 `amneziawg-go` 回退、不删除 IPv6 禁用、不在中转机加入应用层代理。
+
 # v6.34 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
