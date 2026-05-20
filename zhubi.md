@@ -1,5 +1,20 @@
 # Ghost-Proxy 审核记录
 
+# v6.38 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.38.sh`、`install_transit_v6.38.sh`、`install_amneziawg_dkms_v6.38.sh`，并同步稳定入口到 v6.38。
+- ✅ 自动审查发现 DKMS `git clone` 失败可能留下半截目录，导致后续重试被残留目录卡死；已在每次重试前清理目标目录。
+- ✅ DKMS 独立脚本新增源码 tarball 回退下载：默认仓库 `git clone` 失败后改用 GitHub master tarball，可用 `AWG_DKMS_TARBALL_URL` 覆盖。
+- ✅ DKMS 基础编译依赖、当前内核头文件、架构通用头文件安装全部接入重试，降低 apt 临时失败导致安装中断的概率。
+- ✅ DKMS 补装 `amneziawg-tools` 时清理失败残留目录，避免工具补装重试被半截源码目录卡住。
+- ✅ 落地机 `landing-health-check.sh` 去掉 `set -e`，统一 `log_health` 容错，避免单次 `nc/systemctl/logger` 异常导致健康检查服务反复重启。
+- ✅ 落地机 `amneziawg-go` 回退路径的 `golang-go/pkg-config/libmnl-dev` 安装接入重试；`amneziawg-tools` 和 `amneziawg-go` 克隆前清理残留目录。
+- ✅ 落地机 `sing-box` 下载增加连接超时和重试；中转机逻辑不扩展功能，仅同步版本入口。
+- ✅ 落地机客户端 YAML 提示改为必须使用支持 AWG 混淆字段的 Mihomo/Clash Meta，避免误导用户导入不支持混淆的客户端。
+- ✅ 保持不恢复标准 WireGuard 回退、不恢复 HTTP 订阅、不在中转机加入应用层代理、不删除 DKMS 独立脚本、不删除 IPv6 禁用。
+
 # v6.37 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
