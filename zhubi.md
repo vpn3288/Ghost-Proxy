@@ -1,5 +1,17 @@
 # Ghost-Proxy 审核记录
 
+# v6.49 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.49.sh`、`install_transit_v6.49.sh`、`install_amneziawg_dkms_v6.49.sh`，并同步稳定入口到 v6.49。
+- ✅ 修复 P1：落地机 IPv6 防火墙不再设置 `OUTPUT DROP`；改为 `INPUT/OUTPUT` 默认 `ACCEPT`、`FORWARD DROP`，并用 `GHOST_IPV6_INPUT` 专属链阻断 IPv6 入站，降低 Docker/1Panel 冲突。
+- ✅ 修复 P1：AWG 新装默认混淆参数改为 `JMIN=64`、`JMAX=256`，校验推荐范围为 `64 <= JMIN < JMAX <= 1024`；已有旧参数不静默轮换，仅提示，除非设置 `FORCE_ROTATE_OBFS=1`。
+- ✅ 修复 P1：中转机 `load_ghost_rules()` 改为同一 nft 事务中 `destroy` Ghost 专属表并加载新规则，加载失败时不先删除旧规则；依赖补齐 `iproute2`、`iputils-ping`、`coreutils`、`util-linux`。
+- ✅ 修复 P1/P2：`ensure_nft_main_conf()` 只维护 Ghost include，不再因旧 Ghost 标记重写整个 `/etc/nftables.conf`；健康检查遇到无效 `HEALTH_LOG_LEVEL` 会记录 WARN 并回退 `warn`。
+- ✅ 小修：DKMS 输出新增 `ref_matched=true/false`；非 Debian 12 提示中补充 DD 命令；落地机卸载不再触碰 `/etc/resolv.conf` immutable 属性。
+- ✅ 确认：`awg-landing.service` 已在 `AWG_BACKEND=go` 时注入 `WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go`，稳定入口无需重复修复。
+- ❌ 暂缓：不在 `versions.conf` 填写预编译 URL/SHA256，直到 GitHub Releases 真实发布对应 artifacts；不加入预编译 `.ko`。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.49.sh`、`install_transit_v6.49.sh`、`install_amneziawg_dkms_v6.49.sh` 均通过。
+
 # v6.48 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.48.sh`、`install_transit_v6.48.sh`、`install_amneziawg_dkms_v6.48.sh`，并同步稳定入口到 v6.48。
