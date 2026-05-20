@@ -7,6 +7,8 @@
 - ✅ 同步中转机：默认禁用 IPv6 前也执行同样的 ifupdown IPv6 DHCP 清理，避免 DD 系统模板残留 DHCPv6 配置造成系统服务 failed。
 - ✅ 实机验证：v6.61 基线三机验证均 0 失败；发现并修复上述 networking failed 问题后进入 v6.62 复测。
 - ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.62.sh`、`install_transit_v6.62.sh`、`install_amneziawg_dkms_v6.62.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+- ✅ v6.62 实机复测：x86 落地、ARM 落地、中转机重跑安装均成功；三台 `verify_installation.sh` 均 0 失败 0 警告；`systemctl --failed` 均 0；x86 `networking.service` 重启后为 active。
+- ✅ 暴露面复测：中转 8389/8390 可达，落地直连 8389 不可达；中转/落地 AWG UDP 随机探测均无响应；错误输入测试不会停止既有服务。
 
 # v6.61 版本 (2026-05-20)
 
