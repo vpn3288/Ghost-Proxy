@@ -1,5 +1,13 @@
 # Ghost-Proxy 审核记录
 
+# v6.62 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.62.sh`、`install_transit_v6.62.sh`、`install_amneziawg_dkms_v6.62.sh`，并同步稳定入口到 v6.62。
+- ✅ 实机修复：x86 落地机 ifupdown 存在 `iface ens5 inet6 dhcp` 时，禁用 IPv6 会导致 `networking.service` 重启失败；现自动备份并注释 ifupdown 的 IPv6 stanza，保留 IPv4/DNS/Docker/1Panel 配置。
+- ✅ 同步中转机：默认禁用 IPv6 前也执行同样的 ifupdown IPv6 DHCP 清理，避免 DD 系统模板残留 DHCPv6 配置造成系统服务 failed。
+- ✅ 实机验证：v6.61 基线三机验证均 0 失败；发现并修复上述 networking failed 问题后进入 v6.62 复测。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.62.sh`、`install_transit_v6.62.sh`、`install_amneziawg_dkms_v6.62.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.61 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.61.sh`、`install_transit_v6.61.sh`、`install_amneziawg_dkms_v6.61.sh`，并同步稳定入口到 v6.61。
