@@ -1,5 +1,17 @@
 # Ghost-Proxy 审核记录
 
+# v6.48 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.48.sh`、`install_transit_v6.48.sh`、`install_amneziawg_dkms_v6.48.sh`，并同步稳定入口到 v6.48。
+- ✅ 修复 P0：中转机 `ghost-transit-ctl reload-rules` 不再生成 `flush ruleset`，改用 `inet ghost_proxy_filter` / `inet ghost_proxy_nat` 专属表；加载前只删除 Ghost 表，`/etc/nftables.conf` 仅追加/维护 Ghost include，避免清空 Docker/1Panel/用户自建 nftables 规则。
+- ✅ 修复 P1：中转健康检查启动后先执行首轮检查再进入 30-60 分钟随机睡眠；规则丢失检测改为检查 Ghost 专属表，恢复时不再 `restart nftables`。
+- ✅ 修复 P1：落地机优先使用同目录 `install_amneziawg_dkms_v6.48.sh`，远程兜底也拉取同版本文件，避免稳定入口与 DKMS 脚本版本漂移；DKMS 自愈服务增加源码 ref 状态检测。
+- ✅ 修复 P1：落地机卸载不再删除通用 lo/ESTABLISHED/SSH/Docker INPUT 规则，不再改默认策略；新防火墙规则加 `ghost-proxy-landing` 标记，卸载只清理 Ghost 标记和旧版端口残留。
+- ✅ 稳定性小修：落地健康检查 AWG 重启指数退避上限从 300 秒提高到 3600 秒，减少长期故障时的重启噪音。
+- ❌ 驳回：不把预编译 `.ko` 放入项目；内核模块强绑定内核版本和 vermagic，跨 VPS 不可靠。继续保留 DKMS -> 预编译/源码 `amneziawg-go` 混淆回退路线。
+- ❌ 暂缓：不默认 `apt-mark hold` 冻结内核、不默认提高 conntrack；这两项会改变用户系统维护策略或增加全局 sysctl，本轮只保留为手动运维建议。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.48.sh`、`install_transit_v6.48.sh`、`install_amneziawg_dkms_v6.48.sh` 均通过。
+
 # v6.47 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.47.sh`、`install_transit_v6.47.sh`、`install_amneziawg_dkms_v6.47.sh`，并同步稳定入口到 v6.47。
