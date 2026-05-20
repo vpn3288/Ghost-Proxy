@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# 验证说明:
+# - 服务状态、端口监听、配置文件为硬性检查（fail）
+# - 端到端连通性为软性检查（warn），客户端未连接时可忽略
+
 failures=0
 warnings=0
 
@@ -42,11 +46,18 @@ verify_landing() {
         fail "AWG 隧道地址缺失: 10.8.0.1"
     fi
 
-    if [[ -f /etc/awg/awg0.conf ]] \
-        && grep -Eq '^[[:space:]]*(Jc|Jmin|Jmax|S1|S2|H1|H2|H3|H4)[[:space:]]*=' /etc/awg/awg0.conf; then
-        ok "AWG 混淆参数存在"
+    local awg_conf="/etc/landing-ghost/awg0.conf"
+    if [[ -f "${awg_conf}" ]]; then
+        local obfs_ok=1 key
+        for key in Jc Jmin Jmax S1 S2 H1 H2 H3 H4; do
+            if ! grep -Eq "^[[:space:]]*${key}[[:space:]]*=" "${awg_conf}"; then
+                fail "AWG 混淆参数缺失: ${key}"
+                obfs_ok=0
+            fi
+        done
+        [[ "${obfs_ok}" -eq 0 ]] || ok "AWG 混淆参数完整"
     else
-        fail "AWG 混淆参数缺失"
+        fail "AWG 配置文件缺失: ${awg_conf}"
     fi
 
     if [[ -s /etc/landing-ghost/clash-meta-import-block.txt ]] \
@@ -54,6 +65,19 @@ verify_landing() {
         ok "Base64 一键导入块存在且可解码"
     else
         fail "Base64 一键导入块缺失或不可解码"
+    fi
+
+    if [[ -s /etc/landing-ghost/clash-meta-config.yaml ]]; then
+        local yaml_key yaml_ok=1
+        for yaml_key in amnezia-wg-option allowed-ips dialer-proxy; do
+            if ! grep -Eq "^[[:space:]]*${yaml_key}[[:space:]]*:" /etc/landing-ghost/clash-meta-config.yaml; then
+                fail "Mihomo YAML 字段缺失: ${yaml_key}"
+                yaml_ok=0
+            fi
+        done
+        [[ "${yaml_ok}" -eq 0 ]] || ok "Mihomo YAML 关键字段完整"
+    else
+        fail "Mihomo YAML 配置缺失: /etc/landing-ghost/clash-meta-config.yaml"
     fi
 
     if systemctl show awg-landing.service -p Environment 2>/dev/null | grep -q "amneziawg-go"; then

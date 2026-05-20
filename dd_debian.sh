@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.54"
+VERSION="6.55"
 
 usage() {
     cat <<EOF
@@ -77,15 +77,31 @@ case "${ARCH}" in
         DD_CMD="curl -fsSL '${SCRIPT_URL}' -o reinstall.sh && sha256sum reinstall.sh && bash reinstall.sh Debian 12 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
         ;;
     *)
-        die "不支持的架构: ${ARCH}，请显式使用 --arch amd64 或 --arch arm64"
+        echo "当前架构: ${ARCH}" >&2
+        echo "支持的架构: amd64 (x86_64), arm64 (aarch64)" >&2
+        echo "请使用 --arch 参数显式指定，例如:" >&2
+        echo "  bash dd_debian.sh --password '你的SSH密码' --arch amd64" >&2
+        die "不支持的架构: ${ARCH}"
         ;;
 esac
+
+if [[ -n "${SCRIPT_SHA256}" ]]; then
+    case "${ARCH}" in
+        amd64)
+            DD_CMD="curl -fsSLO ${SCRIPT_URL} && printf '%s  %s\n' '${SCRIPT_SHA256}' reinstall.sh | sha256sum -c - && bash reinstall.sh debian 12.14 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+            ;;
+        arm64)
+            DD_CMD="curl -fsSL '${SCRIPT_URL}' -o reinstall.sh && printf '%s  %s\n' '${SCRIPT_SHA256}' reinstall.sh | sha256sum -c - && bash reinstall.sh Debian 12 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+            ;;
+    esac
+fi
 
 cat <<EOF
 Ghost-Proxy DD 辅助脚本 v${VERSION}
 
 推荐系统基线:
   Debian 12.14 Bookworm minimal
+  amd64 使用 bin456789 参数 debian 12.14；arm64 上游脚本仅提供 Debian 12 参数，请 DD 后用 cat /etc/debian_version 确认小版本。
 
 目标架构:
   ${ARCH}

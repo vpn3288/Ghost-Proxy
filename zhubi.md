@@ -1,5 +1,17 @@
 # Ghost-Proxy 审核记录
 
+# v6.55 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.55.sh`、`install_transit_v6.55.sh`、`install_amneziawg_dkms_v6.55.sh`，并同步稳定入口到 v6.55。
+- ✅ 修复 P1：`verify_installation.sh landing` 改查真实 `/etc/landing-ghost/awg0.conf`，逐项校验 `Jc/Jmin/Jmax/S1/S2/H1-H4`，避免把成功安装误报为混淆缺失。
+- ✅ 修复 P1/P2：验证脚本补充 Mihomo YAML `amnezia-wg-option/allowed-ips/dialer-proxy` 检查，并明确端到端连通性为软检查。
+- ✅ 修复 P0/P1：交互模式中转监听端口默认值增加溢出保护；非 x86_64/arm64 架构下载 DKMS 脚本时不再拼接空架构后缀 URL。
+- ✅ 修复 P1：既有 `amneziawg-go/awg/awg-quick` 兜底增加 `awg genkey` 最小能力检测，并在 DKMS/ref 回退路径耗尽前输出明确警告；仍拒绝普通 WireGuard。
+- ✅ 修复 P1/P2：`ip6tables` 插入 Ghost IPv6 链失败会记录警告；中转健康检查首轮延迟缩短到 60-180 秒，循环间隔缩短到 5-10 分钟。
+- ✅ 修复 P1/P2：`dd_debian.sh` 不支持架构时给出显式 `--arch` 示例；提供 SHA256 环境变量时默认打印 `sha256sum -c` 校验命令，并说明 amd64/arm64 DD 目标版本差异。
+- ⏳ 暂缓：`versions.conf` 预编译 URL/SHA256 继续留空，必须等 GitHub Release 真实产物发布并核对校验后再填写；不伪造校验值。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.55.sh`、`install_transit_v6.55.sh`、`install_amneziawg_dkms_v6.55.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.54 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.54.sh`、`install_transit_v6.54.sh`、`install_amneziawg_dkms_v6.54.sh`，并同步稳定入口到 v6.54。
