@@ -1,5 +1,18 @@
 # Ghost-Proxy 审核记录
 
+# v6.46 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.46.sh`、`install_transit_v6.46.sh`、`install_amneziawg_dkms_v6.46.sh`，并同步稳定入口到 v6.46。
+- ✅ 修复 P1：落地机校验既有 `sing-box` 版本，不匹配 `SINGBOX_VERSION` 时重装固定版本；写入 `ss-main/ss-backup` 后先执行 `sing-box check` 再启动服务。
+- ✅ 修复 P1：`SS_PASSWORD` 限制为 base64/URL-safe 字符，复用密码文件时也校验，避免用户传入引号、反斜杠或换行写坏 JSON/YAML。
+- ✅ 修复 P1：家宽策略路由新增 `/usr/local/bin/home-ip-routing-apply.sh` 与 `home-ip-routing.service`，兼容 systemd-networkd 重启后重放规则，不改写 `.network` 文件。
+- ✅ 修复 P1：落地机健康检查只在首次失败、达到阈值和恢复时记录，降低长期日志噪音；`AUTO_DETECT_MTU=1` 改为 3 次探测取中位数。
+- ✅ 修复 P1：DKMS 独立脚本增加 UEK/过旧内核预检，写入 `/var/lib/amneziawg-dkms/ref` 记录当前固定 ref；ref 不匹配时强制重编译，落地机复用既有模块前也会检查该状态。
+- ✅ 修复 P1：DKMS 自愈服务在无完整当前内核头文件时直接跳过，避免新内核无 headers 时反复无效编译。
+- ✅ 修复 P1/P2：中转机 `reload-rules` 增加 `config.json` JSON/必需字段/数组预检，删除废弃 `ask_ports()`；健康检查仅在存在启用端口时要求 `masquerade/dnat`。
+- ⚠️ 评判：`flock` 的内核锁会随进程退出释放，`kill -9` 后仅残留锁文件不会永久阻塞；本轮只增加超时锁提示，不采纳“直接 rm 被持有锁文件”，避免并发加载 nftables。
+- ❌ 驳回：Hysteria2 第三轨和 DD 封装脚本仍不并入默认方案；前者扩大协议栈和暴露面，后者清盘风险过高。AWG-only 仅作为备用方案候选，暂不改变默认双轨。
+
 # v6.45 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.45.sh`、`install_transit_v6.45.sh`、`install_amneziawg_dkms_v6.45.sh`，并同步稳定入口到 v6.45。
