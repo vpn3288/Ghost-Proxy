@@ -1,5 +1,18 @@
 # Ghost-Proxy 审核记录
 
+# v6.45 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.45.sh`、`install_transit_v6.45.sh`、`install_amneziawg_dkms_v6.45.sh`，并同步稳定入口到 v6.45。
+- ✅ 修复 P0：落地机重跑检测到既有 `metadata.json` 时先临停 `awg-landing/ss-main/ss-backup/landing-health-check`，避免被本项目旧服务自占端口卡死。
+- ✅ 修复 P1：`amneziawg-go` 回退幂等检查同时要求 `awg`、`awg-quick`、`amneziawg-go`，避免半安装状态误报成功。
+- ✅ 修复 P1：DKMS 固定版本不可用时回退安装仓库默认 `dkms`；仍保持 DKMS 独立脚本失败后由落地机回退 `amneziawg-go`。
+- ✅ 修复 P1：落地机 SSH 端口优先读取 `sshd_config`，再回退 `ss` 检测；`show-clash-config` 改为 `exec cat`；中转配置名称改用 `LANDING_NAME` 或日期标签。
+- ✅ 采纳稳定性增强：`SS_PASSWORD` 长度校验，自动生成密码做字符类型检查；`AUTO_DETECT_MTU=1` 时等待 `awg0` 就绪后再探测。
+- ✅ 修复 P1：中转机 SNAT 从全局 `oifname != "lo" masquerade` 收窄为仅对启用落地机的目标 IP/端口 masquerade。
+- ✅ README 补充 v6.45、`versions.conf` 使用方式、ARM64 leitbogioro 示例参数；DKMS/落地脚本补充官方 ISO/网络安装链接。
+- ❌ 驳回：新增官方 DD 封装脚本本轮不采纳。DD 会清盘，误用风险高，现阶段只在 README 和脚本提示中给可复制参考。
+- ❌ 暂缓：AWG-only、主备互换、安装后完整验证脚本不并入 v6.45，避免扩大默认行为和测试面；可作为独立备用方案评估。
+
 # v6.44 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.44.sh`、`install_transit_v6.44.sh`、`install_amneziawg_dkms_v6.44.sh`，并同步稳定入口到 v6.44。

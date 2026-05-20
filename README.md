@@ -6,9 +6,9 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.44`
+当前稳定版本：`v6.45`
 
-仓库保留稳定入口和最近审查版本：`v6.37`、`v6.38`、`v6.39`、`v6.40`、`v6.41`、`v6.42`、`v6.43`、`v6.44`。更早版本已清理，避免误用旧脚本。
+仓库保留稳定入口和最近审查版本：`v6.37`、`v6.38`、`v6.39`、`v6.40`、`v6.41`、`v6.42`、`v6.43`、`v6.44`、`v6.45`。更早版本已清理，避免误用旧脚本。
 
 ## 推荐系统基线
 
@@ -30,7 +30,7 @@ ARM64 备用 DD 脚本示例（leitbogioro）：
 
 ```bash
 wget --no-check-certificate -qO InstallNET.sh https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh
-bash InstallNET.sh -debian 12
+bash InstallNET.sh -debian 12 -pwd "自定义密码" -port 22 -timezone "Asia/Shanghai" --cloudkernel "0"
 ```
 
 生产机器建议避免主动 `dist-upgrade` 或更换内核；如追求极稳，可在理解安全更新影响后按架构手动冻结内核元包：
@@ -62,6 +62,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/ins
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms.sh)
 ```
+
+## 版本固定（可选）
+
+`versions.conf` 用于固定 DKMS、GCC、sing-box 和 AmneziaWG 源码 ref。通过 `bash <(curl ...)` 运行时只能使用脚本内置默认值；如需自定义固定版本，请把脚本和 `versions.conf` 下载到同一目录后运行：
+
+```bash
+curl -O https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_landing.sh
+curl -O https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms.sh
+curl -O https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/versions.conf
+bash install_landing.sh
+```
+
+可固定字段：`DKMS_VERSION`、`GCC_VERSION`、`SINGBOX_VERSION`、`AWG_DKMS_REF`、`AWG_TOOLS_REF`、`AWG_GO_REF`。留空表示使用系统仓库或上游默认版本。
 
 ## 卸载
 
