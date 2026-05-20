@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.58 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.58.sh`、`install_transit_v6.58.sh`、`install_amneziawg_dkms_v6.58.sh`，并同步稳定入口到 v6.58。
+- ✅ 修复 P1：中转机在 `LANDING_LIST/LANDING_IP` 非交互安装且 SSH 分配 PTY 时，不再因 `-t 0` 误判交互而等待连通性测试确认。
+- ✅ 调整连通性测试开关：默认跳过；如需安装末尾主动测试，显式设置 `RUN_CONNECTIVITY_TEST=1`。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.58.sh`、`install_transit_v6.58.sh`、`install_amneziawg_dkms_v6.58.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.57 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.57.sh`、`install_transit_v6.57.sh`、`install_amneziawg_dkms_v6.57.sh`，并同步稳定入口到 v6.57。
