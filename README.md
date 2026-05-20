@@ -6,22 +6,22 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.46`
+当前稳定版本：`v6.47`
 
-仓库保留稳定入口和最近两个审查版本：`v6.45`、`v6.46`。`v6.45` 以前的历史脚本已清理，避免误用旧版本。
+仓库保留稳定入口和最近两个审查版本：`v6.46`、`v6.47`。`v6.46` 以前的历史脚本已清理，避免误用旧版本。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.46
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.46
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.46
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.47
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.47
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.47
+install_transit_v6.47.sh        # v6.47 中转机版本快照
+install_landing_v6.47.sh        # v6.47 落地机版本快照
+install_amneziawg_dkms_v6.47.sh # v6.47 DKMS 版本快照
 install_transit_v6.46.sh        # v6.46 中转机版本快照
 install_landing_v6.46.sh        # v6.46 落地机版本快照
 install_amneziawg_dkms_v6.46.sh # v6.46 DKMS 版本快照
-install_transit_v6.45.sh        # v6.45 中转机版本快照
-install_landing_v6.45.sh        # v6.45 落地机版本快照
-install_amneziawg_dkms_v6.45.sh # v6.45 DKMS 版本快照
 versions.conf                   # 依赖和上游源码 ref 固定配置
 zhubi.md                        # 主笔修复记录
 ```
@@ -32,21 +32,21 @@ zhubi.md                        # 主笔修复记录
 
 ```bash
 curl -O https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh
-bash reinstall.sh debian 12 --ssh-port 22
+bash reinstall.sh debian 12.14 --ssh-port 22
 ```
 
 x86_64 备用 DD 脚本示例（MoeClub）：
 
 ```bash
 wget --no-check-certificate -O InstallNET.sh https://github.com/MoeClub/Note/raw/master/InstallNET.sh
-bash InstallNET.sh -debian 12 -v 64 -p "自定义密码" -port 22
+bash InstallNET.sh -debian 12.14 -v 64 -p "自定义密码" -port 22
 ```
 
 ARM64 备用 DD 脚本示例（leitbogioro）：
 
 ```bash
 wget --no-check-certificate -qO InstallNET.sh https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh
-bash InstallNET.sh -debian 12 -pwd "自定义密码" -port 22 -timezone "Asia/Shanghai" --cloudkernel "0"
+bash InstallNET.sh -debian 12.14 -pwd "自定义密码" -port 22 -timezone "Asia/Shanghai" --cloudkernel "0"
 ```
 
 生产机器建议避免主动 `dist-upgrade` 或更换内核；如追求极稳，可在理解安全更新影响后按架构手动冻结内核元包：
@@ -91,6 +91,8 @@ bash install_landing.sh
 ```
 
 可固定字段：`DKMS_VERSION`、`GCC_VERSION`、`SINGBOX_VERSION`、`AWG_DKMS_REF`、`AWG_TOOLS_REF`、`AWG_GO_REF`。留空表示使用系统仓库或上游默认版本。
+
+可选预编译用户态兜底字段：`PREBUILT_AWG_GO_URL_x86_64`、`PREBUILT_AWG_GO_SHA256_x86_64`、`PREBUILT_AWG_TOOLS_URL_x86_64`、`PREBUILT_AWG_TOOLS_SHA256_x86_64`、`PREBUILT_AWG_GO_URL_arm64`、`PREBUILT_AWG_GO_SHA256_arm64`、`PREBUILT_AWG_TOOLS_URL_arm64`、`PREBUILT_AWG_TOOLS_SHA256_arm64`。未发布 Release 资产前保持留空，脚本会自动回退源码编译。
 
 ## 卸载
 

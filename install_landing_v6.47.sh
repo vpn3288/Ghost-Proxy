@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.45.sh — 落地机安装脚本
-# 版本: v6.45 (2026-05-20)
-# v6.45 - 修复重跑自占端口、DKMS 回退检查、密码和 MTU 稳定性。
+# install_landing_v6.47.sh — 落地机安装脚本
+# 版本: v6.47 (2026-05-20)
+# v6.47 - 修复重跑自占端口、健康检查首次盲区并精简 SS 配置生成。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.45"
+VERSION="6.47"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
 DEFAULT_GCC_VERSION="12"
@@ -35,6 +35,14 @@ GCC_VERSION="${GCC_VERSION:-${DEFAULT_GCC_VERSION}}"
 SINGBOX_VERSION="${SINGBOX_VERSION:-${DEFAULT_SINGBOX_VERSION}}"
 AWG_TOOLS_REF="${AWG_TOOLS_REF:-${DEFAULT_AWG_TOOLS_REF}}"
 AWG_GO_REF="${AWG_GO_REF:-${DEFAULT_AWG_GO_REF}}"
+PREBUILT_AWG_GO_URL_x86_64="${PREBUILT_AWG_GO_URL_x86_64:-}"
+PREBUILT_AWG_GO_SHA256_x86_64="${PREBUILT_AWG_GO_SHA256_x86_64:-}"
+PREBUILT_AWG_TOOLS_URL_x86_64="${PREBUILT_AWG_TOOLS_URL_x86_64:-}"
+PREBUILT_AWG_TOOLS_SHA256_x86_64="${PREBUILT_AWG_TOOLS_SHA256_x86_64:-}"
+PREBUILT_AWG_GO_URL_arm64="${PREBUILT_AWG_GO_URL_arm64:-}"
+PREBUILT_AWG_GO_SHA256_arm64="${PREBUILT_AWG_GO_SHA256_arm64:-}"
+PREBUILT_AWG_TOOLS_URL_arm64="${PREBUILT_AWG_TOOLS_URL_arm64:-}"
+PREBUILT_AWG_TOOLS_SHA256_arm64="${PREBUILT_AWG_TOOLS_SHA256_arm64:-}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -160,6 +168,10 @@ uninstall() {
         ip route flush table 100 2>/dev/null || true
         sed -i '/100 home_ip/d' /etc/iproute2/rt_tables 2>/dev/null || true
         rm -f /etc/network/if-up.d/home-ip-routing
+        systemctl stop home-ip-routing.service 2>/dev/null || true
+        systemctl disable home-ip-routing.service 2>/dev/null || true
+        rm -f /etc/systemd/system/home-ip-routing.service
+        rm -f /usr/local/bin/home-ip-routing-apply.sh
         echo -e "${GREEN}策略路由已清理${NC}"
         
         # 清理 cron 任务
@@ -314,7 +326,17 @@ port_in_use() {
 }
 
 stop_own_services_for_reinstall() {
-    if [[ ! -f "${CONFIG_DIR}/metadata.json" ]]; then
+    local service has_existing=0
+    [[ -f "${CONFIG_DIR}/metadata.json" ]] && has_existing=1
+
+    for service in awg-landing.service ss-main.service ss-backup.service landing-health-check.service; do
+        if systemctl is-active --quiet "${service}" 2>/dev/null || systemctl is-enabled --quiet "${service}" 2>/dev/null; then
+            has_existing=1
+            break
+        fi
+    done
+
+    if [[ "${has_existing}" -eq 0 ]]; then
         return 0
     fi
 
@@ -578,38 +600,69 @@ setup_home_ip_routing() {
     success "家宽IP策略路由已配置: ${home_ip} -> ${home_iface} -> ${gateway}"
     log "INFO" "策略路由: table 100, from ${home_ip} via ${gateway} dev ${home_iface}"
     
-    # 持久化配置（写入启动脚本）
-    cat > /etc/network/if-up.d/home-ip-routing <<EOF
+    # 持久化配置：ifupdown 和 systemd-networkd 均通过同一脚本重放策略路由。
+    cat > /usr/local/bin/home-ip-routing-apply.sh <<EOF
 #!/bin/bash
 # 家宽IP策略路由持久化脚本
+set -u
 LOG_FILE="/var/log/landing-ghost.log"
 
 log() {
     echo "\$(date '+%Y-%m-%d %H:%M:%S') [ROUTE] \$*" >> "\${LOG_FILE}"
 }
 
-if [[ "\$IFACE" == "${home_iface}" ]]; then
-    if ip rule add from ${home_ip} table 100 priority 100 2>/dev/null; then
-        log "策略路由规则已添加: from ${home_ip} table 100"
-    fi
-    
-    if ip route add default via ${gateway} dev ${home_iface} table 100 2>/dev/null; then
-        log "策略路由表已配置: default via ${gateway} dev ${home_iface}"
-    fi
-    
-    # 验证策略路由是否生效
-    if ! ip rule show | grep -q "from ${home_ip} lookup 100"; then
-        log "✗ 策略路由规则验证失败"
-    fi
-    
-    if ! ip route show table 100 | grep -q "default via ${gateway}"; then
-        log "✗ 策略路由表验证失败"
-    fi
-    
-    log "策略路由持久化完成: ${home_ip} -> ${home_iface} -> ${gateway}"
+if ! ip link show "${home_iface}" >/dev/null 2>&1; then
+    log "家宽网卡不存在，跳过: ${home_iface}"
+    exit 0
 fi
+
+ip rule del from ${home_ip} table 100 priority 100 2>/dev/null || true
+ip route flush table 100 2>/dev/null || true
+
+if ip rule add from ${home_ip} table 100 priority 100 2>/dev/null; then
+    log "策略路由规则已添加: from ${home_ip} table 100"
+fi
+
+if ip route add default via ${gateway} dev ${home_iface} table 100 2>/dev/null; then
+    log "策略路由表已配置: default via ${gateway} dev ${home_iface}"
+fi
+
+if ! ip rule show | grep -q "from ${home_ip} lookup 100"; then
+    log "策略路由规则验证失败"
+fi
+
+if ! ip route show table 100 | grep -q "default via ${gateway}"; then
+    log "策略路由表验证失败"
+fi
+
+log "策略路由持久化完成: ${home_ip} -> ${home_iface} -> ${gateway}"
 EOF
+    chmod +x /usr/local/bin/home-ip-routing-apply.sh
+
+    cat > /etc/network/if-up.d/home-ip-routing <<'EOF'
+#!/bin/bash
+[ "${IFACE:-}" = "__HOME_IFACE__" ] || exit 0
+exec /usr/local/bin/home-ip-routing-apply.sh
+EOF
+    sed -i "s/__HOME_IFACE__/${home_iface}/g" /etc/network/if-up.d/home-ip-routing
     chmod +x /etc/network/if-up.d/home-ip-routing
+
+    cat > /etc/systemd/system/home-ip-routing.service <<EOF
+[Unit]
+Description=Landing Ghost Home IP Policy Routing
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/home-ip-routing-apply.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable home-ip-routing.service >/dev/null 2>&1 || true
     
     return 0
 }
@@ -679,15 +732,23 @@ ask_transit_info() {
 }
 
 
+validate_ss_password() {
+    local password="$1"
+    if [[ ${#password} -lt 16 ]]; then
+        die "SS_PASSWORD 长度不足 16 字符"
+    fi
+    if [[ ! "${password}" =~ ^[A-Za-z0-9+/=_-]+$ ]]; then
+        die "SS_PASSWORD 只能使用 base64/URL-safe 字符（A-Z a-z 0-9 + / = _ -），避免写坏 JSON/YAML"
+    fi
+}
+
 # 【新增】密码复用机制
 generate_password() {
     local password_file="${CONFIG_DIR}/.ss_password"
     
     # [P0-2] 优先使用环境变量传入的密码（支持多落地机统一密码）
     if [[ -n "${SS_PASSWORD:-}" ]]; then
-        if [[ ${#SS_PASSWORD} -lt 16 ]]; then
-            die "SS_PASSWORD 长度不足 16 字符"
-        fi
+        validate_ss_password "${SS_PASSWORD}"
         info "使用环境变量提供的密码"
         mkdir -p "${CONFIG_DIR}"
         echo "${SS_PASSWORD}" > "${password_file}"
@@ -699,6 +760,7 @@ generate_password() {
     # 如果已有密码文件，复用
     if [[ -f "${password_file}" ]]; then
         SS_PASSWORD=$(cat "${password_file}")
+        validate_ss_password "${SS_PASSWORD}"
         info "复用已有密码（幂等性保护）"
         log "INFO" "从 ${password_file} 读取已有密码"
         return 0
@@ -728,6 +790,7 @@ generate_password() {
     if [[ ${#SS_PASSWORD} -lt 16 ]]; then
         die "密码生成失败（5 次尝试）"
     fi
+    validate_ss_password "${SS_PASSWORD}"
     
     # 保存密码
     mkdir -p "${CONFIG_DIR}"
@@ -896,6 +959,87 @@ install_amneziawg_dkms_standalone() {
     modprobe amneziawg 2>/dev/null
 }
 
+verify_sha256_if_set() {
+    local file="$1" expected="$2"
+    [[ -n "${expected}" ]] || return 0
+    printf '%s  %s\n' "${expected}" "${file}" | sha256sum -c - >/dev/null 2>&1
+}
+
+install_prebuilt_amneziawg_go() {
+    local arch arch_key go_url go_sha tools_url tools_sha tmp_dir awg_bin awg_quick_bin
+    arch="$(uname -m)"
+    case "${arch}" in
+        x86_64|amd64) arch_key="x86_64" ;;
+        aarch64|arm64) arch_key="arm64" ;;
+        *) return 1 ;;
+    esac
+
+    case "${arch_key}" in
+        x86_64)
+            go_url="${PREBUILT_AWG_GO_URL_x86_64}"
+            go_sha="${PREBUILT_AWG_GO_SHA256_x86_64}"
+            tools_url="${PREBUILT_AWG_TOOLS_URL_x86_64}"
+            tools_sha="${PREBUILT_AWG_TOOLS_SHA256_x86_64}"
+            ;;
+        arm64)
+            go_url="${PREBUILT_AWG_GO_URL_arm64}"
+            go_sha="${PREBUILT_AWG_GO_SHA256_arm64}"
+            tools_url="${PREBUILT_AWG_TOOLS_URL_arm64}"
+            tools_sha="${PREBUILT_AWG_TOOLS_SHA256_arm64}"
+            ;;
+    esac
+
+    [[ -n "${go_url}" && -n "${tools_url}" ]] || return 1
+    tmp_dir=$(mktemp -d) || return 1
+
+    info "尝试安装预编译 AmneziaWG 用户态工具链 (${arch_key})"
+    if ! curl -fsSL --connect-timeout 10 --retry 3 "${go_url}" -o "${tmp_dir}/amneziawg-go"; then
+        rm -rf "${tmp_dir}"
+        return 1
+    fi
+    if ! verify_sha256_if_set "${tmp_dir}/amneziawg-go" "${go_sha}"; then
+        warn "预编译 amneziawg-go SHA256 校验失败"
+        rm -rf "${tmp_dir}"
+        return 1
+    fi
+
+    if ! curl -fsSL --connect-timeout 10 --retry 3 "${tools_url}" -o "${tmp_dir}/awg-tools.tar.gz"; then
+        rm -rf "${tmp_dir}"
+        return 1
+    fi
+    if ! verify_sha256_if_set "${tmp_dir}/awg-tools.tar.gz" "${tools_sha}"; then
+        warn "预编译 awg-tools SHA256 校验失败"
+        rm -rf "${tmp_dir}"
+        return 1
+    fi
+
+    mkdir -p "${tmp_dir}/tools"
+    if ! tar -xzf "${tmp_dir}/awg-tools.tar.gz" -C "${tmp_dir}/tools"; then
+        warn "预编译 awg-tools 解压失败"
+        rm -rf "${tmp_dir}"
+        return 1
+    fi
+
+    awg_bin=$(find "${tmp_dir}/tools" -type f -name awg | head -n 1)
+    awg_quick_bin=$(find "${tmp_dir}/tools" -type f -name awg-quick | head -n 1)
+    if [[ -z "${awg_bin}" || -z "${awg_quick_bin}" ]]; then
+        warn "预编译 awg-tools 包缺少 awg/awg-quick"
+        rm -rf "${tmp_dir}"
+        return 1
+    fi
+
+    if ! install -m 0755 "${tmp_dir}/amneziawg-go" /usr/local/bin/amneziawg-go \
+        || ! install -m 0755 "${awg_bin}" /usr/local/bin/awg \
+        || ! install -m 0755 "${awg_quick_bin}" /usr/local/bin/awg-quick; then
+        warn "预编译 AmneziaWG 工具链安装失败"
+        rm -rf "${tmp_dir}"
+        return 1
+    fi
+    rm -rf "${tmp_dir}"
+
+    command -v awg >/dev/null 2>&1 && command -v awg-quick >/dev/null 2>&1 && command -v amneziawg-go >/dev/null 2>&1
+}
+
 # 用户态回退方案（amneziawg-go）
 install_amneziawg_go() {
     info "安装 AmneziaWG 用户态版本（amneziawg-go）"
@@ -904,6 +1048,12 @@ install_amneziawg_go() {
         info "AmneziaWG 工具和用户态后端已安装"
         return 0
     fi
+
+    if install_prebuilt_amneziawg_go; then
+        success "预编译 AmneziaWG 用户态工具链安装完成"
+        return 0
+    fi
+    info "未使用预编译工具链，继续源码编译 amneziawg-go 回退方案"
 
     if ! command -v go &>/dev/null; then
         info "golang-go 未安装，按需安装（用于 amneziawg-go 用户态回退）"
@@ -968,10 +1118,29 @@ install_amneziawg_go() {
     return 0
 }
 
+awg_dkms_ref_matches() {
+    local state_file="/var/lib/amneziawg-dkms/ref"
+    [[ -f "${state_file}" ]] || return 1
+    [[ "$(cat "${state_file}" 2>/dev/null || true)" == "${AWG_DKMS_REF}" ]]
+}
+
 # 统一 AWG 运行时安装入口（自动降级）
 install_awg_runtime() {
     # 优先尝试 DKMS 内核模块
     if modprobe amneziawg 2>/dev/null; then
+        if ! awg_dkms_ref_matches; then
+            warn "检测到 AmneziaWG 内核模块，但 ref 状态未匹配当前固定版本，调用 DKMS 脚本重装"
+            if install_amneziawg_dkms_standalone; then
+                AWG_BACKEND="kernel"
+                success "AmneziaWG 内核模块已按固定 ref 更新"
+                return 0
+            fi
+            warn "固定 ref DKMS 重装失败，将回退 amneziawg-go"
+            install_amneziawg_go || die "DKMS ref 重装失败且 amneziawg-go 安装失败"
+            AWG_BACKEND="go"
+            success "使用 amneziawg-go 用户态版本（支持混淆）"
+            return 0
+        fi
         if ! command -v awg >/dev/null 2>&1 || ! command -v awg-quick >/dev/null 2>&1; then
             warn "检测到 AmneziaWG 内核模块，但缺少 awg/awg-quick，调用 DKMS 脚本补装工具"
             if ! install_amneziawg_dkms_standalone; then
@@ -1030,9 +1199,22 @@ detect_tunnel_mtu() {
         fi
     fi
 
-    pmtu=$(timeout 10 tracepath -n "${TRANSIT_IP}" 2>/dev/null | awk '/pmtu/ {print $2}' | tail -1 || true)
+    local pmtu_samples=() attempt sorted
+    for attempt in 1 2 3; do
+        pmtu=$(timeout 10 tracepath -n "${TRANSIT_IP}" 2>/dev/null | awk '/pmtu/ {print $2}' | tail -1 || true)
+        if [[ -n "${pmtu}" && "${pmtu}" =~ ^[0-9]+$ && ${pmtu} -ge 1200 ]]; then
+            pmtu_samples+=("${pmtu}")
+        fi
+        [[ "${attempt}" -lt 3 ]] && sleep 2
+    done
+
+    if [[ ${#pmtu_samples[@]} -gt 0 ]]; then
+        sorted=$(printf '%s\n' "${pmtu_samples[@]}" | sort -n)
+        pmtu=$(sed -n "$(( (${#pmtu_samples[@]} + 1) / 2 ))p" <<< "${sorted}")
+    fi
+
     if [[ -z "${pmtu}" || ! "${pmtu}" =~ ^[0-9]+$ || ${pmtu} -lt 1200 ]]; then
-        warn "MTU 探测失败（tracepath 可能被防火墙阻断），使用默认值 ${OPTIMAL_MTU}"
+        warn "MTU 探测失败（3次尝试，tracepath 可能被防火墙阻断），使用默认值 ${OPTIMAL_MTU}"
         log "WARN" "MTU 探测失败，使用默认值 ${OPTIMAL_MTU}"
         return 0
     fi
@@ -1089,8 +1271,19 @@ install_shadowsocks() {
     progress 5 11 "安装 Shadowsocks-2022 (sing-box)"
     
     if command -v sing-box &>/dev/null; then
-        info "sing-box 已安装,跳过"
-        return 0
+        local sing_box_bin
+        sing_box_bin=$(command -v sing-box)
+        local installed_ver
+        installed_ver=$("${sing_box_bin}" version 2>/dev/null | awk 'NR==1 {print $3}')
+        if [[ "${installed_ver}" == "${SINGBOX_VERSION}" ]]; then
+            if [[ ! -x /usr/local/bin/sing-box ]]; then
+                install -m 0755 "${sing_box_bin}" /usr/local/bin/sing-box || die "固定 sing-box 到 /usr/local/bin 失败"
+            fi
+            info "sing-box ${installed_ver} 已安装，版本匹配"
+            return 0
+        fi
+        warn "sing-box 版本不匹配（当前: ${installed_ver:-unknown}, 需要: ${SINGBOX_VERSION}），重新安装固定版本"
+        rm -f /usr/local/bin/sing-box
     fi
     
     # 修复：官方脚本可能超时，改用GitHub Release直接下载
@@ -1122,6 +1315,16 @@ install_shadowsocks() {
     rm -rf sing-box.tar.gz "${EXTRACT_DIR}"
     
     success "Shadowsocks-2022 安装完成"
+}
+
+check_singbox_configs() {
+    local config
+    for config in "${CONFIG_DIR}/ss-main.json" "${CONFIG_DIR}/ss-backup.json"; do
+        if ! /usr/local/bin/sing-box check -c "${config}" >/dev/null 2>&1; then
+            die "sing-box 配置检查失败: ${config}"
+        fi
+    done
+    success "sing-box 配置检查通过"
 }
 
 
@@ -1330,150 +1533,61 @@ configure_shadowsocks() {
         warn "检测到已有 ss-backup 配置，已备份"
     fi
     
-    log "INFO" "生成 Shadowsocks 主轨配置"
-    # v6.0: 主轨也需要绑定家宽网卡（修复家宽IP侧漏）
+    write_singbox_ss_config() {
+        local file="$1" tag="$2" listen="$3" port="$4" network="$5" bind_iface="$6"
+        local tmp_file="${file}.tmp.$$"
+        jq -n \
+            --arg tag "${tag}" \
+            --arg listen "${listen}" \
+            --arg password "${SS_PASSWORD}" \
+            --arg network "${network}" \
+            --arg bind_iface "${bind_iface}" \
+            --argjson port "${port}" '
+            {
+              log: {
+                level: "warn",
+                timestamp: true
+              },
+              inbounds: [
+                ({
+                  type: "shadowsocks",
+                  tag: $tag,
+                  listen: $listen,
+                  listen_port: $port,
+                  method: "2022-blake3-aes-256-gcm",
+                  password: $password,
+                  multiplex: {
+                    enabled: true,
+                    padding: true,
+                    brutal: {
+                      enabled: false
+                    }
+                  }
+                } + (if $network == "" then {} else {network: $network} end))
+              ],
+              outbounds: [
+                ({
+                  type: "direct",
+                  tag: "direct"
+                } + (if $bind_iface == "" then {} else {bind_interface: $bind_iface} end))
+              ]
+            }' > "${tmp_file}" || die "生成 ${file} 失败"
+        mv -f "${tmp_file}" "${file}" || die "写入 ${file} 失败"
+    }
+
     if [[ -n "${home_iface}" ]]; then
-        info "主轨将绑定家宽IP网卡: ${home_iface}"
-        log "INFO" "ss-main 绑定网卡 ${home_iface}"
-        cat > "${CONFIG_DIR}/ss-main.json" <<EOF
-{
-  "log": {
-    "level": "warn",
-    "timestamp": true
-  },
-  "inbounds": [
-    {
-      "type": "shadowsocks",
-      "tag": "ss-main",
-      "listen": "10.8.0.1",
-      "listen_port": ${SS_MAIN_PORT},
-      "method": "2022-blake3-aes-256-gcm",
-      "password": "${SS_PASSWORD}",
-      "multiplex": {
-        "enabled": true,
-        "padding": true,
-        "brutal": {
-          "enabled": false
-        }
-      }
-    }
-  ],
-  "outbounds": [
-    {
-      "type": "direct",
-      "tag": "direct",
-      "bind_interface": "${home_iface}"
-    }
-  ]
-}
-EOF
-    else
-        cat > "${CONFIG_DIR}/ss-main.json" <<EOF
-{
-  "log": {
-    "level": "warn",
-    "timestamp": true
-  },
-  "inbounds": [
-    {
-      "type": "shadowsocks",
-      "tag": "ss-main",
-      "listen": "10.8.0.1",
-      "listen_port": ${SS_MAIN_PORT},
-      "method": "2022-blake3-aes-256-gcm",
-      "password": "${SS_PASSWORD}",
-      "multiplex": {
-        "enabled": true,
-        "padding": true,
-        "brutal": {
-          "enabled": false
-        }
-      }
-    }
-  ],
-  "outbounds": [
-    {
-      "type": "direct",
-      "tag": "direct"
-    }
-  ]
-}
-EOF
+        info "主轨/备轨将绑定家宽IP网卡: ${home_iface}"
+        log "INFO" "ss-main/ss-backup 绑定网卡 ${home_iface}"
     fi
+
+    log "INFO" "生成 Shadowsocks 主轨配置"
+    write_singbox_ss_config "${CONFIG_DIR}/ss-main.json" "ss-main" "10.8.0.1" "${SS_MAIN_PORT}" "" "${home_iface}"
     
     log "INFO" "生成 Shadowsocks 备轨配置"
-    if [[ -n "${home_iface}" ]]; then
-        info "备轨将绑定家宽IP网卡: ${home_iface}"
-        log "INFO" "ss-backup 绑定网卡 ${home_iface}"
-        cat > "${CONFIG_DIR}/ss-backup.json" <<EOF
-{
-  "log": {
-    "level": "warn",
-    "timestamp": true
-  },
-  "inbounds": [
-    {
-      "type": "shadowsocks",
-      "tag": "ss-backup",
-      "listen": "0.0.0.0",
-      "listen_port": ${SS_BACKUP_PORT},
-      "network": "tcp",
-      "method": "2022-blake3-aes-256-gcm",
-      "password": "${SS_PASSWORD}",
-      "multiplex": {
-        "enabled": true,
-        "padding": true,
-        "brutal": {
-          "enabled": false
-        }
-      }
-    }
-  ],
-  "outbounds": [
-    {
-      "type": "direct",
-      "tag": "direct",
-      "bind_interface": "${home_iface}"
-    }
-  ]
-}
-EOF
-    else
-        cat > "${CONFIG_DIR}/ss-backup.json" <<EOF
-{
-  "log": {
-    "level": "warn",
-    "timestamp": true
-  },
-  "inbounds": [
-    {
-      "type": "shadowsocks",
-      "tag": "ss-backup",
-      "listen": "0.0.0.0",
-      "listen_port": ${SS_BACKUP_PORT},
-      "network": "tcp",
-      "method": "2022-blake3-aes-256-gcm",
-      "password": "${SS_PASSWORD}",
-      "multiplex": {
-        "enabled": true,
-        "padding": true,
-        "brutal": {
-          "enabled": false
-        }
-      }
-    }
-  ],
-  "outbounds": [
-    {
-      "type": "direct",
-      "tag": "direct"
-    }
-  ]
-}
-EOF
-    fi
+    write_singbox_ss_config "${CONFIG_DIR}/ss-backup.json" "ss-backup" "0.0.0.0" "${SS_BACKUP_PORT}" "tcp" "${home_iface}"
     
     success "Shadowsocks-2022 配置完成"
+    check_singbox_configs
 }
 
 
@@ -1640,11 +1754,11 @@ MAX_FAIL_COUNT=3
 AWG_COOLDOWN=10
 
 while true; do
-    sleep \$((600 + RANDOM % 1200))
-
     if ! ip addr show awg0 2>/dev/null | grep -q "10.8.0.1"; then
         AWG_FAIL_COUNT=\$((AWG_FAIL_COUNT + 1))
-        log_health warn "AWG隧道异常 (失败计数: \${AWG_FAIL_COUNT}/\${MAX_FAIL_COUNT})"
+        if [ "\${AWG_FAIL_COUNT}" -eq 1 ] || [ "\${AWG_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
+            log_health warn "AWG隧道异常 (失败计数: \${AWG_FAIL_COUNT}/\${MAX_FAIL_COUNT})"
+        fi
 
         if [ "\${AWG_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
             log_health warn "AWG连续失败\${MAX_FAIL_COUNT}次，执行重启"
@@ -1668,6 +1782,9 @@ while true; do
             fi
         fi
     else
+        if [ "\${AWG_FAIL_COUNT}" -gt 0 ]; then
+            log_health info "AWG隧道已恢复"
+        fi
         AWG_FAIL_COUNT=0
         AWG_COOLDOWN=10
     fi
@@ -1675,7 +1792,9 @@ while true; do
     if command -v nc >/dev/null 2>&1; then
         if ! nc -zw3 10.8.0.1 ${SS_MAIN_PORT} >/dev/null 2>&1; then
             SS_MAIN_FAIL_COUNT=\$((SS_MAIN_FAIL_COUNT + 1))
-            log_health warn "SS主轨端口异常 (失败计数: \${SS_MAIN_FAIL_COUNT}/\${MAX_FAIL_COUNT})"
+            if [ "\${SS_MAIN_FAIL_COUNT}" -eq 1 ] || [ "\${SS_MAIN_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
+                log_health warn "SS主轨端口异常 (失败计数: \${SS_MAIN_FAIL_COUNT}/\${MAX_FAIL_COUNT})"
+            fi
             if [ "\${SS_MAIN_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
                 log_health warn "SS主轨连续失败\${MAX_FAIL_COUNT}次，执行重启"
                 systemctl restart ss-main.service 2>/dev/null || log_health error "ss-main重启失败"
@@ -1683,6 +1802,9 @@ while true; do
                 sleep 5
             fi
         else
+            if [ "\${SS_MAIN_FAIL_COUNT}" -gt 0 ]; then
+                log_health info "SS主轨端口已恢复"
+            fi
             SS_MAIN_FAIL_COUNT=0
         fi
     else
@@ -1692,7 +1814,9 @@ while true; do
     if command -v ss >/dev/null 2>&1; then
         if ! ss -H -tln "sport = :${SS_BACKUP_PORT}" 2>/dev/null | grep -q .; then
             SS_BACKUP_FAIL_COUNT=\$((SS_BACKUP_FAIL_COUNT + 1))
-            log_health warn "SS备轨监听异常 (失败计数: \${SS_BACKUP_FAIL_COUNT}/\${MAX_FAIL_COUNT})"
+            if [ "\${SS_BACKUP_FAIL_COUNT}" -eq 1 ] || [ "\${SS_BACKUP_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
+                log_health warn "SS备轨监听异常 (失败计数: \${SS_BACKUP_FAIL_COUNT}/\${MAX_FAIL_COUNT})"
+            fi
             if [ "\${SS_BACKUP_FAIL_COUNT}" -ge "\${MAX_FAIL_COUNT}" ]; then
                 log_health warn "SS备轨连续失败\${MAX_FAIL_COUNT}次，执行重启"
                 systemctl restart ss-backup.service 2>/dev/null || log_health error "ss-backup重启失败"
@@ -1700,11 +1824,16 @@ while true; do
                 sleep 5
             fi
         else
+            if [ "\${SS_BACKUP_FAIL_COUNT}" -gt 0 ]; then
+                log_health info "SS备轨监听已恢复"
+            fi
             SS_BACKUP_FAIL_COUNT=0
         fi
     else
         log_health warn "ss命令不存在，跳过备轨监听检测"
     fi
+
+    sleep \$((600 + RANDOM % 1200))
 done
 EOF
     chmod +x /usr/local/bin/landing-health-check.sh
@@ -2072,11 +2201,11 @@ main() {
     check_os
     check_1panel_conflict
     install_dependencies
-    generate_obfuscation_params
     
     ask_transit_info
     stop_own_services_for_reinstall
     configure_ports
+    generate_obfuscation_params
     
     echo ""
     lockdown_dns_ipv6

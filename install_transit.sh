@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_transit_v6.46.sh — 中转机安装脚本
-# 版本: v6.46 (2026-05-20)
-# v6.46 - 增强 reload 锁、配置预检并删除废弃全局端口函数。
+# install_transit_v6.47.sh — 中转机安装脚本
+# 版本: v6.47 (2026-05-20)
+# v6.47 - 修复 nft 卸载误伤、reload 预检和管理工具 warn 缺失。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 版本号
-VERSION="6.46"
+VERSION="6.47"
 SCRIPT_NAME="install_transit_v${VERSION}.sh"
 CONFIG_DIR="/etc/ghost-transit"
 CONFIG_FILE="${CONFIG_DIR}/config.json"
@@ -725,6 +725,10 @@ set -euo pipefail
 CONFIG_FILE="/etc/ghost-transit/config.json"
 NFT_RULES="/etc/nftables.conf"
 
+warn() {
+    echo "WARN: $*" >&2
+}
+
 # P1-1: 添加备份清理函数（管理工具需要独立定义）
 cleanup_old_backups() {
     local file_pattern="$1"
@@ -767,7 +771,12 @@ cmd_status() {
 
 cmd_reload() {
     echo "重新加载 nftables 规则..."
-    nft -f "${NFT_RULES}" && echo "✓ 重新加载成功" || echo "✗ 重新加载失败"
+    if nft -c -f "${NFT_RULES}" && nft -f "${NFT_RULES}"; then
+        echo "✓ 重新加载成功"
+    else
+        echo "✗ 规则验证或加载失败"
+        return 1
+    fi
 }
 
 cmd_reload_rules() {
@@ -848,7 +857,8 @@ cmd_reload_rules() {
             [.landings[] | select(.enabled == true) as $landing |
              $landing.ports[]? | "        ip daddr \($landing.ip) \(.proto) dport \(.target) masquerade"] | join("\n");
         
-        "#!/usr/sbin/nft -f\n\n" +
+        "#!/usr/sbin/nft -f\n" +
+        "# Ghost-Proxy nftables rules\n\n" +
         "flush ruleset\n\n" +
         "table inet filter {\n" +
         (if $use_ft then
@@ -1303,15 +1313,19 @@ uninstall() {
         # 完全卸载
         echo -e "${YELLOW}正在清理 nftables 规则...${NC}"
         
-        # 停止并禁用 nftables
-        systemctl stop nftables 2>/dev/null || true
-        systemctl disable nftables 2>/dev/null || true
+        # 不停止/禁用 nftables 服务，避免触发发行版 ExecStop 清空第三方规则。
+        # 仅删除本脚本维护的 Ghost-Proxy 表，避免清空第三方 nftables 规则。
+        nft delete table inet filter 2>/dev/null || true
+        nft delete table inet nat 2>/dev/null || true
         
-        # 清空 nftables 规则
-        nft flush ruleset 2>/dev/null || true
-        
-        # 删除 nftables 配置文件
-        rm -f /etc/nftables.conf
+        # 只删除带 Ghost-Proxy 标记的配置文件，避免误删第三方 nftables 配置。
+        if [[ ! -f /etc/nftables.conf ]]; then
+            :
+        elif grep -q "Ghost-Proxy nftables rules" /etc/nftables.conf 2>/dev/null; then
+            rm -f /etc/nftables.conf
+        else
+            warn "/etc/nftables.conf 未带 Ghost-Proxy 标记，已保留"
+        fi
         
         echo -e "${GREEN}nftables 规则已清理${NC}"
         
@@ -1465,7 +1479,9 @@ main() {
             validate_port "${ssh_port}" || die "LANDING_LIST 中 SSH 端口无效: ${item}"
             validate_port "${awg_target}" || die "LANDING_LIST 中 AWG 目标端口无效: ${item}"
             validate_port "${ss_target}" || die "LANDING_LIST 中 SS 目标端口无效: ${item}"
-            add_landing "${ip}" "${name}" "${ssh_port}" "${awg_port}" "${awg_target}" "${ss_port}" "${ss_target}"
+            if ! add_landing "${ip}" "${name}" "${ssh_port}" "${awg_port}" "${awg_target}" "${ss_port}" "${ss_target}"; then
+                die "添加落地机失败: ${name} (${ip})"
+            fi
             idx=$((idx + 1))
         done
         success "LANDING_LIST 配置完成"

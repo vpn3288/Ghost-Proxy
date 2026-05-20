@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.45"
+VERSION="6.47"
 MODULE_NAME="amneziawg"
 DEFAULT_REPO_URL="https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git"
 # AmneziaWG upstream source refs pinned on 2026-05-20 for reproducible builds.
@@ -40,6 +40,8 @@ BUILD_SOURCE_DIR=""
 BUILD_SWAP_FILE="/var/tmp/amneziawg-dkms-build.swap"
 BUILD_SWAP_CREATED=0
 ARCH_HEADER_PKG=""
+STATE_DIR="/var/lib/amneziawg-dkms"
+REF_STATE_FILE="${STATE_DIR}/ref"
 
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
 info() { log "INFO: $*"; }
@@ -112,6 +114,28 @@ detect_platform() {
     esac
 
     info "系统: ${PRETTY_NAME:-unknown}, 架构: $(uname -m), 内核: $(uname -r)"
+}
+
+check_kernel_compatibility() {
+    local kernel_version kernel_major kernel_minor
+    kernel_version=$(uname -r)
+    kernel_major=$(printf '%s\n' "${kernel_version}" | cut -d. -f1)
+    kernel_minor=$(printf '%s\n' "${kernel_version}" | cut -d. -f2)
+    kernel_major=${kernel_major%%[^0-9]*}
+    kernel_minor=${kernel_minor%%[^0-9]*}
+
+    if [[ "${kernel_version}" =~ [Uu][Ee][Kk] ]]; then
+        warn "检测到 Oracle UEK 内核 (${kernel_version})，外置 DKMS 模块常见失败；调用方应回退 amneziawg-go"
+        return 1
+    fi
+
+    if [[ -n "${kernel_major}" && -n "${kernel_minor}" ]] \
+        && { [[ "${kernel_major}" -lt 5 ]] || [[ "${kernel_major}" -eq 5 && "${kernel_minor}" -lt 10 ]]; }; then
+        warn "内核版本 ${kernel_version} 过旧（推荐 5.10+），DKMS 风险较高；调用方应回退 amneziawg-go"
+        return 1
+    fi
+
+    return 0
 }
 
 check_kernel_symbols() {
@@ -266,6 +290,17 @@ module_ready() {
         && modinfo "${MODULE_NAME}" >/dev/null 2>&1
 }
 
+ref_state_matches() {
+    [[ -f "${REF_STATE_FILE}" ]] || return 1
+    [[ "$(cat "${REF_STATE_FILE}" 2>/dev/null || true)" == "${AWG_DKMS_REF}" ]]
+}
+
+write_ref_state() {
+    mkdir -p "${STATE_DIR}"
+    printf '%s\n' "${AWG_DKMS_REF}" > "${REF_STATE_FILE}"
+    chmod 600 "${REF_STATE_FILE}" 2>/dev/null || true
+}
+
 clone_source() {
     WORK_DIR=$(mktemp -d)
     info "下载 AmneziaWG 内核模块源码: ${AWG_DKMS_REF}"
@@ -378,8 +413,12 @@ install_with_dkms_direct() {
 
 install_module() {
     if [[ "${FORCE_REINSTALL:-0}" != "1" ]] && module_ready; then
-        info "AmneziaWG 内核模块已就绪，跳过重复编译"
-        return 0
+        if ref_state_matches; then
+            info "AmneziaWG 内核模块已就绪，ref 匹配，跳过重复编译"
+            return 0
+        fi
+        warn "已加载模块缺少当前 ref 状态记录，强制按 ${AWG_DKMS_REF} 重新安装"
+        FORCE_REINSTALL=1
     fi
 
     clone_source
@@ -394,6 +433,7 @@ install_module() {
     modprobe "${MODULE_NAME}" || die "DKMS 安装完成但 modprobe ${MODULE_NAME} 失败"
     lsmod | grep -q "^${MODULE_NAME}" || die "modprobe 返回成功但 ${MODULE_NAME} 未出现在 lsmod 中"
     modinfo "${MODULE_NAME}" >/dev/null || die "无法读取 ${MODULE_NAME} 模块信息"
+    write_ref_state
 }
 
 ensure_module_autoload() {
@@ -459,7 +499,7 @@ After=network.target
 Type=oneshot
 Environment=DKMS_VERSION=${DKMS_VERSION}
 Environment=GCC_VERSION=${GCC_VERSION}
-ExecStart=/bin/bash -c 'modprobe ${MODULE_NAME} 2>/dev/null && exit 0; for i in 1 2 3; do FORCE_REINSTALL=1 /usr/local/bin/install_amneziawg_dkms.sh && exit 0; sleep 30; done; echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2; exit 1'
+ExecStart=/bin/bash -c 'kver="\$(uname -r)"; modprobe ${MODULE_NAME} 2>/dev/null && exit 0; test -f "/lib/modules/\${kver}/build/Makefile" || { echo "SKIP: no complete kernel headers for \${kver}" >&2; exit 0; }; for i in 1 2 3; do FORCE_REINSTALL=1 /usr/local/bin/install_amneziawg_dkms.sh && exit 0; sleep 30; done; echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2; exit 1'
 RemainAfterExit=yes
 
 [Install]
@@ -505,6 +545,7 @@ main() {
 
     require_root
     detect_platform
+    check_kernel_compatibility || exit 1
     install_packages || { warn "头文件安装失败，调用方将回退"; exit 1; }
     check_kernel_symbols || {
         warn "内核符号预检失败，继续尝试 DKMS 编译；失败后由落地机回退 amneziawg-go"

@@ -1,5 +1,17 @@
 # Ghost-Proxy 审核记录
 
+# v6.47 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.47.sh`、`install_transit_v6.47.sh`、`install_amneziawg_dkms_v6.47.sh`，并同步稳定入口到 v6.47。
+- ✅ 修复 P1：中转机完全卸载不再 `nft flush ruleset`，也不停止/禁用 `nftables` 服务；仅删除本脚本维护的 `inet filter` / `inet nat` 表，`/etc/nftables.conf` 只在带 Ghost-Proxy 标记时删除；`ghost-transit-ctl reload` 增加 `nft -c` 预检，管理工具补齐 `warn()`。
+- ✅ 修复 P1：DKMS 自愈 service 改为运行时计算 `uname -r`，避免内核升级后仍检查安装时旧内核 headers。
+- ✅ 修复 P1：落地机重跑自占端口检测改为同时检查 `metadata.json` 与本项目 systemd 服务状态；混淆参数生成移动到用户输入完成之后，减少中断残留。
+- ✅ 修复 P1/P2：落地机健康检查启动后先检查一次再进入 10-30 分钟随机间隔；`ss-main/ss-backup` 配置改用 `jq` 单函数生成，保留家宽网卡绑定、主轨 AWG 内监听和备轨 TCP 限制。
+- ✅ 采纳稳定性增强：`versions.conf` 新增可选预编译 `amneziawg-go` / `awg-tools` URL 与 SHA256 字段；落地机用户态回退优先尝试已发布的 amd64/arm64 预编译包，失败再源码编译。
+- ✅ README 更新当前稳定版本、Debian 12.14 DD 示例和预编译工具链配置说明。
+- ❌ 驳回：不把预编译 `.ko` 内核模块塞进仓库；`.ko` 强绑定内核版本，仍坚持 DKMS 本机编译，失败后回退支持混淆的 `amneziawg-go`。
+- ❌ 暂缓：AWG-only、Docker 化、Hysteria2/REALITY 第三轨不并入 v6.47；它们会扩大测试面或改变默认暴露面，本轮只做备用工具链兜底。
+
 # v6.46 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.46.sh`、`install_transit_v6.46.sh`、`install_amneziawg_dkms_v6.46.sh`，并同步稳定入口到 v6.46。

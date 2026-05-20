@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_transit_v6.45.sh — 中转机安装脚本
-# 版本: v6.45 (2026-05-20)
-# v6.45 - 收窄中转 SNAT 范围，仅对启用落地机端口做 masquerade。
+# install_transit_v6.47.sh — 中转机安装脚本
+# 版本: v6.47 (2026-05-20)
+# v6.47 - 修复 nft 卸载误伤、reload 预检和管理工具 warn 缺失。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 版本号
-VERSION="6.45"
+VERSION="6.47"
 SCRIPT_NAME="install_transit_v${VERSION}.sh"
 CONFIG_DIR="/etc/ghost-transit"
 CONFIG_FILE="${CONFIG_DIR}/config.json"
@@ -384,10 +384,8 @@ test_connectivity() {
         while kill -0 "${pid}" 2>/dev/null; do
             if [[ "$(date +%s)" -ge "${deadline}" ]]; then
                 warn "连通性测试超时（${timeout}秒），终止任务组: ${pid}"
-                pkill -TERM -P "${pid}" 2>/dev/null || true
                 kill -TERM "${pid}" 2>/dev/null || true
                 sleep 1
-                pkill -KILL -P "${pid}" 2>/dev/null || true
                 kill -KILL "${pid}" 2>/dev/null || true
                 break
             fi
@@ -586,10 +584,6 @@ ask_landings() {
     success "落地机配置完成，共 ${count} 个"
 }
 
-ask_ports() {
-    warn "v6.28 起不再使用全局端口配置，端口已在添加每台落地机时配置"
-}
-
 print_help() {
     cat <<EOF
 用法: bash ${SCRIPT_NAME} [--status|--uninstall|--help]
@@ -731,6 +725,10 @@ set -euo pipefail
 CONFIG_FILE="/etc/ghost-transit/config.json"
 NFT_RULES="/etc/nftables.conf"
 
+warn() {
+    echo "WARN: $*" >&2
+}
+
 # P1-1: 添加备份清理函数（管理工具需要独立定义）
 cleanup_old_backups() {
     local file_pattern="$1"
@@ -773,7 +771,12 @@ cmd_status() {
 
 cmd_reload() {
     echo "重新加载 nftables 规则..."
-    nft -f "${NFT_RULES}" && echo "✓ 重新加载成功" || echo "✗ 重新加载失败"
+    if nft -c -f "${NFT_RULES}" && nft -f "${NFT_RULES}"; then
+        echo "✓ 重新加载成功"
+    else
+        echo "✗ 规则验证或加载失败"
+        return 1
+    fi
 }
 
 cmd_reload_rules() {
@@ -781,9 +784,18 @@ cmd_reload_rules() {
     local lock_file="/var/run/ghost-transit-reload.lock"
     exec 201>"${lock_file}"
     if ! flock -n 201; then
-        echo "规则重载已在进行中，跳过"
+        local lock_age=0
+        if [[ -f "${lock_file}" ]]; then
+            lock_age=$(( $(date +%s) - $(stat -c %Y "${lock_file}" 2>/dev/null || echo 0) ))
+        fi
+        if [[ "${lock_age}" -gt 300 ]]; then
+            warn "规则重载锁已存在 ${lock_age} 秒，但仍被进程持有；不强行删除，避免并发加载 nftables"
+        else
+            echo "规则重载已在进行中，跳过"
+        fi
         return 0
     fi
+    printf '%s\n' "$$" > "${lock_file}" 2>/dev/null || true
     
     echo "重新生成并加载 nftables 规则..."
     
@@ -805,6 +817,23 @@ cmd_reload_rules() {
         use_flowtable=false
     fi
     
+    # 先验证 config.json，避免损坏配置进入 jq 规则生成阶段。
+    if ! jq empty "${CONFIG_FILE}" 2>/dev/null; then
+        echo "✗ 配置文件 JSON 格式错误: ${CONFIG_FILE}"
+        return 1
+    fi
+    local required_field
+    for required_field in ssh_port landings; do
+        if ! jq -e ".${required_field}" "${CONFIG_FILE}" >/dev/null 2>&1; then
+            echo "✗ 配置文件缺少必需字段: ${required_field}"
+            return 1
+        fi
+    done
+    if ! jq -e '.landings | type == "array"' "${CONFIG_FILE}" >/dev/null 2>&1; then
+        echo "✗ 配置文件字段 landings 必须是数组"
+        return 1
+    fi
+
     # 获取 SSH 端口
     local ssh_port
     ssh_port=$(jq -r '.ssh_port' "${CONFIG_FILE}")
@@ -828,7 +857,8 @@ cmd_reload_rules() {
             [.landings[] | select(.enabled == true) as $landing |
              $landing.ports[]? | "        ip daddr \($landing.ip) \(.proto) dport \(.target) masquerade"] | join("\n");
         
-        "#!/usr/sbin/nft -f\n\n" +
+        "#!/usr/sbin/nft -f\n" +
+        "# Ghost-Proxy nftables rules\n\n" +
         "flush ruleset\n\n" +
         "table inet filter {\n" +
         (if $use_ft then
@@ -1140,7 +1170,7 @@ nat_rules=$(nft list table inet nat 2>/dev/null || true)
 enabled_ports=$(jq '[.landings[]? | select(.enabled == true) | .ports[]?] | length' "${CONFIG_FILE}" 2>/dev/null || echo 0)
 if ! grep -q "type nat hook prerouting" <<< "${nat_rules}" \
    || ! grep -q "type nat hook postrouting" <<< "${nat_rules}" \
-   || ! grep -q "masquerade" <<< "${nat_rules}" \
+   || { [[ "${enabled_ports}" =~ ^[0-9]+$ && "${enabled_ports}" -gt 0 ]] && ! grep -q "masquerade" <<< "${nat_rules}"; } \
    || { [[ "${enabled_ports}" =~ ^[0-9]+$ && "${enabled_ports}" -gt 0 ]] && ! grep -q "dnat ip to" <<< "${nat_rules}"; }; then
     log "ERROR: nftables 关键 NAT 规则缺失，尝试重新生成并加载"
     reload_rules || systemctl restart nftables 2>/dev/null || log "ERROR: nftables 关键规则恢复失败"
@@ -1283,15 +1313,19 @@ uninstall() {
         # 完全卸载
         echo -e "${YELLOW}正在清理 nftables 规则...${NC}"
         
-        # 停止并禁用 nftables
-        systemctl stop nftables 2>/dev/null || true
-        systemctl disable nftables 2>/dev/null || true
+        # 不停止/禁用 nftables 服务，避免触发发行版 ExecStop 清空第三方规则。
+        # 仅删除本脚本维护的 Ghost-Proxy 表，避免清空第三方 nftables 规则。
+        nft delete table inet filter 2>/dev/null || true
+        nft delete table inet nat 2>/dev/null || true
         
-        # 清空 nftables 规则
-        nft flush ruleset 2>/dev/null || true
-        
-        # 删除 nftables 配置文件
-        rm -f /etc/nftables.conf
+        # 只删除带 Ghost-Proxy 标记的配置文件，避免误删第三方 nftables 配置。
+        if [[ ! -f /etc/nftables.conf ]]; then
+            :
+        elif grep -q "Ghost-Proxy nftables rules" /etc/nftables.conf 2>/dev/null; then
+            rm -f /etc/nftables.conf
+        else
+            warn "/etc/nftables.conf 未带 Ghost-Proxy 标记，已保留"
+        fi
         
         echo -e "${GREEN}nftables 规则已清理${NC}"
         
@@ -1445,7 +1479,9 @@ main() {
             validate_port "${ssh_port}" || die "LANDING_LIST 中 SSH 端口无效: ${item}"
             validate_port "${awg_target}" || die "LANDING_LIST 中 AWG 目标端口无效: ${item}"
             validate_port "${ss_target}" || die "LANDING_LIST 中 SS 目标端口无效: ${item}"
-            add_landing "${ip}" "${name}" "${ssh_port}" "${awg_port}" "${awg_target}" "${ss_port}" "${ss_target}"
+            if ! add_landing "${ip}" "${name}" "${ssh_port}" "${awg_port}" "${awg_target}" "${ss_port}" "${ss_target}"; then
+                die "添加落地机失败: ${name} (${ip})"
+            fi
             idx=$((idx + 1))
         done
         success "LANDING_LIST 配置完成"

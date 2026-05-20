@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.46"
+VERSION="6.47"
 MODULE_NAME="amneziawg"
 DEFAULT_REPO_URL="https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git"
 # AmneziaWG upstream source refs pinned on 2026-05-20 for reproducible builds.
@@ -499,7 +499,7 @@ After=network.target
 Type=oneshot
 Environment=DKMS_VERSION=${DKMS_VERSION}
 Environment=GCC_VERSION=${GCC_VERSION}
-ExecStart=/bin/bash -c 'modprobe ${MODULE_NAME} 2>/dev/null && exit 0; test -f /lib/modules/$(uname -r)/build/Makefile || { echo "SKIP: no complete kernel headers for $(uname -r)" >&2; exit 0; }; for i in 1 2 3; do FORCE_REINSTALL=1 /usr/local/bin/install_amneziawg_dkms.sh && exit 0; sleep 30; done; echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2; exit 1'
+ExecStart=/bin/bash -c 'kver="\$(uname -r)"; modprobe ${MODULE_NAME} 2>/dev/null && exit 0; test -f "/lib/modules/\${kver}/build/Makefile" || { echo "SKIP: no complete kernel headers for \${kver}" >&2; exit 0; }; for i in 1 2 3; do FORCE_REINSTALL=1 /usr/local/bin/install_amneziawg_dkms.sh && exit 0; sleep 30; done; echo "AWG DKMS 恢复失败，将在下次 kernel 更新后重试" >&2; exit 1'
 RemainAfterExit=yes
 
 [Install]
