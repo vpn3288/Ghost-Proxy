@@ -1,5 +1,19 @@
 # Ghost-Proxy 审核记录
 
+# v6.43 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.43.sh`、`install_transit_v6.43.sh`、`install_amneziawg_dkms_v6.43.sh`，并同步稳定入口到 v6.43。
+- ✅ 修复 P0：`ss-backup.json` 显式 `"network": "tcp"`，客户端备轨 `udp: false`，防火墙额外 DROP `SS_BACKUP_PORT/udp`，避免备轨公网 UDP 暴露。
+- ✅ 修复 P0：`APPEND_PUBLIC_DNS=1` 优先使用 `resolvectl dns/domain global`；`/etc/resolv.conf` 为符号链接且无 `resolvectl` 时只告警不写入，避免破坏 systemd-resolved。
+- ✅ 修复 P0/P1：落地机每次尝试刷新 DKMS 独立脚本，不再依赖脆弱的版本字符串 grep；关键默认版本 `DKMS_VERSION/GCC_VERSION/SINGBOX_VERSION` 内置到脚本，`bash <(curl ...)` 也生效。
+- ✅ 修复 P1：`LANDING_INDEX` 非交互校验拆分为缺失、非数字、小于 1 三类明确错误。
+- ✅ 修复 P1：落地健康检查增加 AWG 重启指数退避，systemd service 默认 `HEALTH_LOG_LEVEL=warn`。
+- ✅ 修复 P1：中转机连通性测试移除 `tail --pid` 等待，改为 `kill -0` 超时轮询并清理子进程。
+- ✅ 修复 P1：DKMS 自愈 service 继承 `DKMS_VERSION/GCC_VERSION`；冻结内核提示按 x86_64/ARM64 输出。
+- ✅ 采纳 P2：MTU 探测增加 `timeout`、临时备份名带 PID、重启后验证 awg0；ip6tables lo 规则改为 `-C` 后再追加；中转管理工具 IP 校验补 octet 范围。
+- ❌ 驳回：新增“已知兼容内核白名单”暂不采用，避免误伤可编译的新内核；当前 DKMS 失败后由落地机回退 `amneziawg-go` 更稳。
+- ❌ 驳回：备轨改 Hysteria2 / 双 AWG 不作为默认方案，增加协议栈和暴露面，不符合当前极简双轨目标。
+
 # v6.42 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.42.sh`、`install_transit_v6.42.sh`、`install_amneziawg_dkms_v6.42.sh`，并同步稳定入口到 v6.42。

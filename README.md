@@ -6,9 +6,9 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.42`
+当前稳定版本：`v6.43`
 
-仓库保留稳定入口和最近审查版本：`v6.37`、`v6.38`、`v6.39`、`v6.40`、`v6.41`、`v6.42`。更早版本已清理，避免误用旧脚本。
+仓库保留稳定入口和最近审查版本：`v6.37`、`v6.38`、`v6.39`、`v6.40`、`v6.41`、`v6.42`、`v6.43`。更早版本已清理，避免误用旧脚本。
 
 ## 推荐系统基线
 
@@ -26,10 +26,14 @@ wget --no-check-certificate -qO InstallNET.sh https://raw.githubusercontent.com/
 bash InstallNET.sh -debian 12
 ```
 
-生产机器建议避免主动 `dist-upgrade` 或更换内核；如追求极稳，可在理解安全更新影响后手动冻结内核元包：
+生产机器建议避免主动 `dist-upgrade` 或更换内核；如追求极稳，可在理解安全更新影响后按架构手动冻结内核元包：
 
 ```bash
+# x86_64
 apt-mark hold linux-image-amd64 linux-headers-amd64
+
+# ARM64
+apt-mark hold linux-image-arm64 linux-headers-arm64
 ```
 
 ## 安装
