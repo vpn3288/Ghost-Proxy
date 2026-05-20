@@ -1,5 +1,20 @@
 # Ghost-Proxy 审核记录
 
+# v6.36 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.36.sh`、`install_transit_v6.36.sh`、`install_amneziawg_dkms_v6.36.sh`，并同步稳定入口 `install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh` 到 v6.36。
+- ✅ 落地机稳定入口文件头同步到 v6.36；删除未使用的 `verify_bbr()` 预检和调用，BBR 仍在系统优化阶段配置。
+- ✅ 落地机 DKMS 独立脚本搜索路径只保留稳定入口、`/usr/local/bin`、`/root`、`/tmp`，不再堆叠旧版本路径。
+- ✅ 落地机基础依赖移除 `pkg-config libmnl-dev`，仅在 `amneziawg-tools` 编译路径按需安装；`amneziawg-go` 混淆回退保留。
+- ✅ 落地机密码生成兼容删除 `\n\r`；`show-clash-config` 改用 `cat`；隧道建立后 MTU 探测等待由 2 秒延长到 5 秒。
+- ✅ 落地机继续保留 AWG/SS 端口仅允许中转机访问后的公网兜底 DROP，不改 Docker/1Panel 兼容策略。
+- ✅ 中转机稳定入口文件头同步到 v6.36；`ghost-transit-ctl add-landing` 增加运行时 UDP/TCP 端口占用检测，避免后期追加落地机踩到系统服务端口。
+- ✅ 中转机健康检查间隔由 10-15 分钟调整为 15-20 分钟，降低长期无人值守日志和 CPU 噪音。
+- ✅ DKMS 独立脚本 swap 清理 service 改用 `${BUILD_SWAP_FILE}` 展开写入，避免路径维护不一致。
+- ✅ 保持不恢复标准 WireGuard 回退、不恢复 HTTP 订阅、不删除独立 DKMS 脚本、不删除 `amneziawg-go` 回退、不删除 IPv6 禁用。
+
 # v6.35 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
