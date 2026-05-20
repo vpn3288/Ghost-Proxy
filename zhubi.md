@@ -1,5 +1,15 @@
 # Ghost-Proxy 审核记录
 
+# v6.42 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.42.sh`、`install_transit_v6.42.sh`、`install_amneziawg_dkms_v6.42.sh`，并同步稳定入口到 v6.42。
+- ✅ DKMS、`amneziawg-tools`、`amneziawg-go` 默认固定到 2026-05-20 可见上游提交；保留 `AWG_DKMS_REF`、`AWG_TOOLS_REF`、`AWG_GO_REF` 覆盖。
+- ✅ 新增 `versions.conf`，集中记录 Debian 12.14 基线、DKMS/GCC/sing-box 版本和 AWG 上游源码 ref；脚本同目录运行时会自动读取。
+- ✅ DKMS 独立脚本支持 `DKMS_VERSION`、`GCC_VERSION` 可选固定 apt 依赖版本，并补充 Debian 12 Bookworm minimal / DD 基线提示。
+- ✅ 落地机 MTU 写回前备份 `awg0.conf`，`sed` 或服务重启失败时恢复旧配置并回退 `OPTIMAL_MTU`。
+- ✅ 中转机连通性测试和健康检查 ICMP 增加 `timeout`，并支持 `HEALTH_LOG_LEVEL=error|warn|info` 降低长期日志噪音。
+- ✅ README 补充推荐 DD 基线、内核升级风险和手动 `apt-mark hold` 提示；不自动 DD、不默认冻结内核。
+
 # v6.41 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.41.sh`、`install_transit_v6.41.sh`、`install_amneziawg_dkms_v6.41.sh`，并同步稳定入口到 v6.41。
