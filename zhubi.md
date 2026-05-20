@@ -1,5 +1,20 @@
 # Ghost-Proxy 审核记录
 
+# v6.34 版本 (2026-05-20)
+
+### 主笔 AI 本轮修复
+
+- ✅ 新增 `install_landing_v6.34.sh`、`install_transit_v6.34.sh`、`install_amneziawg_dkms_v6.34.sh`，并同步稳定入口 `install_amneziawg_dkms.sh` 到 v6.34。
+- ✅ DKMS 独立脚本修复 swap 清理 service 变量展开；模块已就绪时不因缺少 `awg/awg-quick` 重编内核，只进入工具补装流程；pipe 安装时健康服务优先下载稳定入口。
+- ✅ 落地机基础依赖移除无条件 `golang-go`，仅在 `amneziawg-go` 回退时按需安装；已有内核模块但工具缺失时只编译 `amneziawg-tools`。
+- ✅ 落地机 DKMS 搜索顺序改为稳定入口优先；非交互安装补充 `SS_BACKUP_PORT` 占用检测；交互端口重选增加 10 次上限。
+- ✅ 落地机 MTU 探测改为隧道建立后检测 `10.8.0.1`，并写回 `awg0.conf` 后重启 AWG；记录 v6.33 的 1360 默认值用于链式代理保守开销。
+- ✅ 落地机健康检查在 `nc` 缺失时跳过端口检测并写入日志；`show-clash-config` 使用 `#!/usr/bin/env bash` 与 `/bin/cat`。
+- ✅ 中转机网络检查兼容缺少 `getent` 的极简系统；安装连通性测试优先探测落地机真实 TCP 代理目标端口，再回退 SSH。
+- ✅ 中转机 `reload-rules` 写规则改为 `printf '%s'`，避免转义内容被二次解释；公网 IP 查询改为 HTTPS。
+- ✅ 保持不恢复标准 WireGuard 回退、不恢复 HTTP 订阅服务、不删除 amneziawg-go 回退、不删除 IPv6 禁用。
+- ✅ 已执行 `bash -n`：`install_landing_v6.34.sh`、`install_transit_v6.34.sh`、`install_amneziawg_dkms_v6.34.sh`、`install_amneziawg_dkms.sh` 均通过。
+
 # v6.33 版本 (2026-05-20)
 
 ### 主笔 AI 本轮修复
