@@ -17,6 +17,8 @@
 - ✅ 故障注入后复核：中转机双落地仍可达，`systemctl --failed` 均 0；中转 8389/8390 可达，落地直连 8389 仍不可达。
 - ✅ 中转 nft 故障注入：删除 `ghost_proxy_filter`/`ghost_proxy_nat` 两张 Ghost 专属表后，执行 `ghost-transit-ctl reload-rules` 可恢复；恢复后 nat/filter 规则 hash 与删除前一致，验证 0 失败 0 警告。
 - ✅ nft 恢复后暴露面复核：中转 8389/8390 可达，落地直连 8389 不可达；中转/落地 AWG UDP 随机探测均无响应。
+- ✅ DKMS 模块自愈注入：x86 落地机停止 `awg-landing/ss-main` 后卸载 `amneziawg` 模块，重新启动 `awg-landing` 可由 prestart 自动加载模块并恢复 `awg0`；落地和中转验证均 0 失败 0 警告。
+- ✅ DKMS 自愈后暴露面复核：中转 8389/8390 可达，落地直连 8389 仍不可达，双落地配置未漂移。
 
 # v6.61 版本 (2026-05-20)
 
