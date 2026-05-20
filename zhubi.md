@@ -8,6 +8,8 @@
 - ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.63.sh`、`install_transit_v6.63.sh`、`install_amneziawg_dkms_v6.63.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
 - ✅ v6.63 实机复测：x86/ARM 落地机重跑后 `clash-meta-config.yaml`、`clash-meta-subscription.txt`、`clash-meta-import-block.txt` 均为 `600`，Base64 可解码且混淆字段完整；密钥/密码/混淆参数不漂移。
 - ✅ 中转机同步 v6.63 后双落地验证 0 失败 0 警告，`systemctl --failed` 为 0；中转 8389/8390 可达，落地直连 8389 仍不可达。
+- ✅ 中转完全卸载/重装复测：执行 `install_transit.sh --uninstall` 完全卸载后 Ghost nft 表、配置目录、管理工具均删除，nftables 服务保持 active；随后从清理状态用 `LANDING_LIST` 重装 v6.63，双落地配置恢复。
+- ✅ 中转重装后全链路复核：中转验证 0 失败 0 警告，x86/ARM 落地验证 0 失败 0 警告；中转 8389/8390 可达，落地直连 8389 仍不可达。
 
 # v6.62 版本 (2026-05-20)
 
