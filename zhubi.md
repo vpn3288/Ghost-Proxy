@@ -15,6 +15,8 @@
 - ✅ 幂等复测：x86/ARM 落地机重跑 v6.62 后 AWG 密钥、SS 密码、Jc/Jmin/Jmax/S1/S2/H1-H4 指纹均保持不变，验证 0 失败 0 警告。
 - ✅ 健康检查故障注入：ARM 落地机停掉 `ss-main`、`ss-backup`、`awg-landing` 后，用临时快进版健康检查模拟连续失败，均能自动恢复；正式脚本未改动，最终验证 0 失败 0 警告。
 - ✅ 故障注入后复核：中转机双落地仍可达，`systemctl --failed` 均 0；中转 8389/8390 可达，落地直连 8389 仍不可达。
+- ✅ 中转 nft 故障注入：删除 `ghost_proxy_filter`/`ghost_proxy_nat` 两张 Ghost 专属表后，执行 `ghost-transit-ctl reload-rules` 可恢复；恢复后 nat/filter 规则 hash 与删除前一致，验证 0 失败 0 警告。
+- ✅ nft 恢复后暴露面复核：中转 8389/8390 可达，落地直连 8389 不可达；中转/落地 AWG UDP 随机探测均无响应。
 
 # v6.61 版本 (2026-05-20)
 
