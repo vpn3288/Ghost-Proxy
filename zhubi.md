@@ -1,5 +1,19 @@
 # Ghost-Proxy 审核记录
 
+# v6.51 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.51.sh`、`install_transit_v6.51.sh`、`install_amneziawg_dkms_v6.51.sh`，并同步稳定入口到 v6.51。
+- ✅ 修复 P0/P1：`install_amneziawg_go()` 内部失败改为 `warn + return 1`，不再用 `die` 直接中断调用方；最终仍拒绝回退到普通 WireGuard。
+- ✅ 修复 P1：预编译 `amneziawg-go` / `awg-tools` 拆分安装，任一 URL 配置后必须提供 SHA256；缺失或校验失败即跳过预编译并回退源码编译。
+- ✅ 修复 P1：用户态 AWG 写入 `/var/lib/amneziawg-go/ref`，复用既有 `awg/awg-quick/amneziawg-go` 前必须匹配 `AWG_TOOLS_REF:AWG_GO_REF`。
+- ✅ 修复 P1：`APPEND_PUBLIC_DNS=1` 在 `AUTO_INSTALL=1` 或 `SKIP_DNS_WARNING=1` 时不再强制等待 5 秒。
+- ✅ 修复 P1：落地健康检查运行时从 `awg-landing.service` 检测 `amneziawg-go` 后端，避免安装时写死 `AWG_BACKEND`。
+- ✅ 修复 P1：落地卸载在无 `iptables` 环境下跳过防火墙清理，避免 `set -e` 直接退出。
+- ✅ 修复 P0/P1：中转卸载删除已移除目录下 `health_check.sh` 的重复 `rm`；`/etc/nftables.conf` 只有确认为 Ghost 专属 loader 时才删除，否则只移除 Ghost include。
+- ❌ 驳回：不采纳 `nft rename table` 原子交换建议；当前 `load_ghost_rules()` 已用同一 nft batch 预检并加载，rename table 兼容性和语义风险更高。
+- ❌ 暂缓：AWG-only、DD helper、GitHub Actions 预编译发布属于备用方案建设，不进入本轮主线修复。
+- ✅ 已执行 `bash -n`：稳定入口和 v6.51 三个快照均通过。
+
 # v6.50 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.50.sh`、`install_transit_v6.50.sh`、`install_amneziawg_dkms_v6.50.sh`，并同步稳定入口到 v6.50。
