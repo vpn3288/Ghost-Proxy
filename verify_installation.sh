@@ -42,6 +42,20 @@ verify_landing() {
         fail "AWG 隧道地址缺失: 10.8.0.1"
     fi
 
+    if [[ -f /etc/awg/awg0.conf ]] \
+        && grep -Eq '^[[:space:]]*(Jc|Jmin|Jmax|S1|S2|H1|H2|H3|H4)[[:space:]]*=' /etc/awg/awg0.conf; then
+        ok "AWG 混淆参数存在"
+    else
+        fail "AWG 混淆参数缺失"
+    fi
+
+    if [[ -s /etc/landing-ghost/clash-meta-import-block.txt ]] \
+        && base64 -d /etc/landing-ghost/clash-meta-import-block.txt >/dev/null 2>&1; then
+        ok "Base64 一键导入块存在且可解码"
+    else
+        fail "Base64 一键导入块缺失或不可解码"
+    fi
+
     if systemctl show awg-landing.service -p Environment 2>/dev/null | grep -q "amneziawg-go"; then
         ok "AWG 后端: amneziawg-go"
     elif lsmod 2>/dev/null | grep -q "^amneziawg"; then
@@ -65,6 +79,12 @@ verify_landing() {
     else
         fail "SS 备轨未监听 TCP ${ss_backup_port}"
     fi
+
+    if timeout 3 bash -c ":</dev/tcp/10.8.0.1/${ss_main_port}" >/dev/null 2>&1; then
+        ok "SS 主轨在 AWG 网关地址可建立本机 TCP 连接"
+    else
+        warn "SS 主轨本机 TCP 探测未通过；如客户端未连接，请结合服务日志排查"
+    fi
 }
 
 tcp_probe() {
@@ -80,22 +100,35 @@ verify_transit() {
 
     [[ -f /etc/ghost-transit/config.json ]] || fail "缺少 /etc/ghost-transit/config.json"
 
-    if systemctl is-active --quiet nftables 2>/dev/null; then
-        ok "nftables 服务运行中"
-    else
-        fail "nftables 服务未运行"
-    fi
-
+    local ghost_tables_ok=1
     if nft list table inet ghost_proxy_filter >/dev/null 2>&1; then
         ok "nftables filter 表存在"
     else
         fail "nftables filter 表缺失"
+        ghost_tables_ok=0
     fi
 
     if nft list table inet ghost_proxy_nat >/dev/null 2>&1; then
         ok "nftables nat 表存在"
     else
         fail "nftables nat 表缺失"
+        ghost_tables_ok=0
+    fi
+
+    if systemctl is-active --quiet nftables 2>/dev/null; then
+        ok "nftables 服务运行中"
+    elif [[ "${ghost_tables_ok}" -eq 1 ]]; then
+        warn "nftables 服务未处于 active，但 Ghost 表已加载；建议执行 systemctl enable --now nftables"
+    else
+        fail "nftables 服务未运行且 Ghost 表缺失"
+    fi
+
+    local nat_rules
+    nat_rules="$(nft list table inet ghost_proxy_nat 2>/dev/null || true)"
+    if grep -q "type nat hook prerouting" <<< "${nat_rules}" && grep -q "type nat hook postrouting" <<< "${nat_rules}"; then
+        ok "nftables NAT 钩子存在"
+    else
+        fail "nftables NAT 关键钩子缺失"
     fi
 
     local landings_count reachable=0 enabled_count=0

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.53"
+VERSION="6.54"
 
 usage() {
     cat <<EOF
@@ -9,7 +9,7 @@ usage() {
 
 说明:
   默认只打印推荐 DD 命令，不会清盘。
-  加 --execute 后会二次确认并在 10 秒倒计时后执行。
+  加 --execute 后会二次确认并在 10 秒倒计时后执行；执行前必须提供对应脚本 SHA256。
   DD/网络重装会清空服务器，仅限新机或已确认救援能力的机器。
 EOF
 }
@@ -23,6 +23,9 @@ SSH_PASSWORD=""
 ARCH="$(uname -m)"
 SSH_PORT="22"
 EXECUTE=0
+SCRIPT_URL=""
+SCRIPT_SHA256=""
+SCRIPT_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -61,11 +64,17 @@ fi
 case "${ARCH}" in
     x86_64|amd64)
         ARCH="amd64"
-        DD_CMD="curl -O https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh && bash reinstall.sh debian 12.14 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+        SCRIPT_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
+        SCRIPT_SHA256="${BIN456789_REINSTALL_SHA256:-}"
+        SCRIPT_ARGS=(debian 12.14 --password "${SSH_PASSWORD}" --ssh-port "${SSH_PORT}")
+        DD_CMD="curl -fsSLO ${SCRIPT_URL} && sha256sum reinstall.sh && bash reinstall.sh debian 12.14 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
         ;;
     aarch64|arm64)
         ARCH="arm64"
-        DD_CMD="bash <(wget --no-check-certificate -qO- 'https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh') Debian 12 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+        SCRIPT_URL="https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh"
+        SCRIPT_SHA256="${LEITBOGIORO_REINSTALL_SHA256:-}"
+        SCRIPT_ARGS=(Debian 12 --password "${SSH_PASSWORD}" --ssh-port "${SSH_PORT}")
+        DD_CMD="curl -fsSL '${SCRIPT_URL}' -o reinstall.sh && sha256sum reinstall.sh && bash reinstall.sh Debian 12 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
         ;;
     *)
         die "不支持的架构: ${ARCH}，请显式使用 --arch amd64 或 --arch arm64"
@@ -105,4 +114,10 @@ done
 read -r -p "请输入 DD-DEBIAN 继续执行: " confirm
 [[ "${confirm}" == "DD-DEBIAN" ]] || die "确认文本不匹配，已取消"
 
-bash -lc "${DD_CMD}"
+[[ -n "${SCRIPT_SHA256}" ]] || die "为避免执行未校验的清盘脚本，--execute 需要设置 ${ARCH} 对应 SHA256 环境变量：BIN456789_REINSTALL_SHA256 或 LEITBOGIORO_REINSTALL_SHA256"
+
+tmp_script="$(mktemp)"
+trap 'rm -f "${tmp_script}"' EXIT
+curl -fsSL "${SCRIPT_URL}" -o "${tmp_script}"
+printf '%s  %s\n' "${SCRIPT_SHA256}" "${tmp_script}" | sha256sum -c -
+bash "${tmp_script}" "${SCRIPT_ARGS[@]}"

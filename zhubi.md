@@ -1,5 +1,19 @@
 # Ghost-Proxy 审核记录
 
+# v6.54 版本 (2026-05-20)
+
+- ✅ 新增 `install_landing_v6.54.sh`、`install_transit_v6.54.sh`、`install_amneziawg_dkms_v6.54.sh`，并同步稳定入口到 v6.54。
+- ✅ 修复 P1：中转机安装在 Ghost 规则原子加载后显式启动 `nftables`；`verify_installation.sh` 不再把“服务 inactive 但 Ghost 表已加载”误判为硬失败，并补查 NAT 关键钩子。
+- ✅ 修复 P1：家宽网卡自动探测排除 Docker/桥接/veth/WG 类接口，只接受带默认路由和网关的私网出站口；策略路由验证失败时不再写入 sing-box `bind_interface`。
+- ✅ 修复 P1：落地机卸载清理 `ghost-proxy-landing` 规则改用 `awk` 只跳过匹配的 `-A` 规则行，保留 iptables-save 表结构；1Panel 端口检测移除 `grep -P` 依赖。
+- ✅ 修复 P1：DKMS 和源码编译用户态回退均失败时，最终再检测既有 `amneziawg-go/awg/awg-quick`，可用则继续使用，仍拒绝普通 WireGuard 回退。
+- ✅ 修复 P1/P2：中转健康检查增加 5-15 分钟初始随机延迟；virtio/hyperv/xen 等虚拟网卡默认关闭 flowtable；公网 IP 输出支持 `PUBLIC_IP/LANDING_PUBLIC_IP/TRANSIT_PUBLIC_IP` 覆盖。
+- ✅ 修复 P1/P2：DKMS 脚本 `apt-get update` 失败后尝试使用现有缓存继续安装，并支持 `SKIP_APT_UPDATE=1`；低内存无 swap 时临时 swap 提升到 2G，极低可用内存时 `MAKEFLAGS=-j1`。
+- ✅ 修复 P1：`dd_debian.sh --execute` 不再直接执行未校验远程清盘脚本，必须提供对应 SHA256 环境变量后才会下载、校验并执行。
+- ✅ 增强验证：`verify_installation.sh landing` 增加 AWG 混淆字段、Base64 导入块和 SS 主轨本机 TCP 探测；客户端未连接的端到端 ping 不作为硬失败。
+- ⚖️ 评判：不自动执行 `apt-mark hold` 锁内核，避免阻断安全更新；继续在安装摘要中给出明确 hold 命令，由用户按生产策略决定。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`install_landing_v6.54.sh`、`install_transit_v6.54.sh`、`install_amneziawg_dkms_v6.54.sh`、`dd_debian.sh`、`verify_installation.sh` 均通过。
+
 # v6.53 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.53.sh`、`install_transit_v6.53.sh`、`install_amneziawg_dkms_v6.53.sh`，并同步稳定入口到 v6.53。
