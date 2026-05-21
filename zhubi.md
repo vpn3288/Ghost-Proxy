@@ -1,5 +1,14 @@
 # Ghost-Proxy 审核记录
 
+# v6.67 版本 (2026-05-21)
+
+- ✅ 新增 `install_landing_v6.67.sh`、`install_transit_v6.67.sh`、`install_amneziawg_dkms_v6.67.sh`，并同步稳定入口到 v6.67。
+- ✅ 修复中转机端口映射脱节：`ghost-transit-ctl add-landing` 对同一落地机 IP 不再报错退出，改为更新名称、SSH 端口和 AWG/SS 端口映射后重新加载 nftables。
+- ✅ `.gitattributes` 增加 `versions.conf text eol=lf`，修复 Windows 工作区上传后 Debian `source versions.conf` 出现 `$'\r': command not found`。
+- ✅ 实机定位：用户 YAML 指向 `61820/18389`，中转机旧规则仍为 `51820/8389`，导致主轨 `10.8.0.1:8388` 和备轨均超时；同步中转规则后，本机 Mihomo v1.19.24 访问 `https://cp.cloudflare.com/generate_204` 返回 204。
+- ✅ 实机复测：中转机 v6.67 已安装；x86/ARM 落地机非交互重跑 v6.67 后 `verify_installation.sh` 均 0 警告；本机 Mihomo 分别强制 x86/ARM 主轨和备轨，四次请求均返回 204。
+- ✅ 保持中转机纯 nftables，不新增 HTTP 订阅、不引入应用层代理。
+
 # v6.66 版本 (2026-05-21)
 
 - ✅ 新增 `install_landing_v6.66.sh`、`install_transit_v6.66.sh`、`install_amneziawg_dkms_v6.66.sh`，并同步稳定入口到 v6.66。
