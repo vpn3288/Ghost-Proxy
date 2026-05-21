@@ -1,10 +1,18 @@
 # Ghost-Proxy 审核记录
 
+# v6.69 版本 (2026-05-21)
+
+- ✅ 新增 `install_landing_v6.69.sh`、`install_transit_v6.69.sh`、`install_amneziawg_dkms_v6.69.sh`，并同步稳定入口到 v6.69；清理 v6.68 快照，仓库继续只保留最新快照。
+- ✅ 删除无效 Base64 导入输出：不再生成 `clash-meta-import-block.txt`、`clash-meta-subscription.txt`、`ss-backup-uri-base64.txt`。
+- ✅ 落地机安装完成和 `show-ghost-nodes` 只直接打印 `SUBSTORE_YAML_START/END` 与 `SUBSTORE_JSON_START/END` 两段内容，分别对应 Sub-Store 推荐的 Clash Proxies YAML 与备用逐行 JSON。
+- ✅ `verify_installation.sh` 改为校验 `substore-awg-for-mihomo.yaml` 与 `substore-awg-for-mihomo-jsonlines.txt`。
+- ✅ 实机复测：x86 落地机 `47.251.82.237` 重跑 v6.69 后旧 Base64 文件不存在，`show-ghost-nodes` 只打印 YAML/JSON 标记段，验证 0 警告。
+
 # 仓库整理 (2026-05-21)
 
 - ✅ 清理 `v6.55` 至 `v6.67` 历史脚本快照，仓库只保留稳定入口和最新 `v6.68` 三个版本快照；旧版本通过 Git 历史回溯。
 - ✅ README 当前稳定版本和项目结构同步到 `v6.68`。
-- ✅ 不改动安装逻辑、不改变中转纯 nftables、落地 AWG+SS 双轨和 Base64/Sub-Store 输出。
+- ✅ 不改动安装逻辑、不改变中转纯 nftables、落地 AWG+SS 双轨和当时的节点输出。
 
 # v6.68 版本 (2026-05-21)
 

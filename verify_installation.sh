@@ -60,23 +60,34 @@ verify_landing() {
         fail "AWG 配置文件缺失: ${awg_conf}"
     fi
 
-    if [[ -s /etc/landing-ghost/clash-meta-import-block.txt ]] \
-        && base64 -d /etc/landing-ghost/clash-meta-import-block.txt >/tmp/ghost-proxy-import-block.txt 2>/dev/null; then
-        ok "Base64 一键导入块存在且可解码"
+    if [[ -s /etc/landing-ghost/substore-awg-for-mihomo.yaml ]]; then
+        local substore_yaml_ok=1
+        for yaml_key in AWG-Tunnel 主轨-UDP极速 备轨-TCP稳定 amnezia-wg-option allowed-ips dialer-proxy; do
+            if ! grep -Fq "${yaml_key}" /etc/landing-ghost/substore-awg-for-mihomo.yaml; then
+                fail "Sub-Store YAML 缺少: ${yaml_key}"
+                substore_yaml_ok=0
+            fi
+        done
+        [[ "${substore_yaml_ok}" -eq 0 ]] || ok "Sub-Store Clash Proxies YAML 完整"
+    else
+        fail "Sub-Store YAML 缺失: /etc/landing-ghost/substore-awg-for-mihomo.yaml"
+    fi
+
+    if [[ -s /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt ]]; then
         local import_key import_ok=1
         for import_key in AWG-Tunnel 主轨-UDP极速 备轨-TCP稳定; do
-            if ! grep -Fq "\"name\":\"${import_key}\"" /tmp/ghost-proxy-import-block.txt; then
-                fail "Base64 Sub-Store 节点缺少: ${import_key}"
+            if ! grep -Fq "\"name\":\"${import_key}\"" /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt; then
+                fail "Sub-Store 逐行 JSON 缺少: ${import_key}"
                 import_ok=0
             fi
         done
-        if ! while IFS= read -r line; do [[ -z "${line}" ]] || jq -e '.name and .type' >/dev/null <<< "${line}"; done < /tmp/ghost-proxy-import-block.txt; then
-            fail "Base64 Sub-Store 节点不是逐行 JSON"
+        if ! while IFS= read -r line; do [[ -z "${line}" ]] || jq -e '.name and .type' >/dev/null <<< "${line}"; done < /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt; then
+            fail "Sub-Store 逐行 JSON 格式异常"
             import_ok=0
         fi
-        [[ "${import_ok}" -eq 0 ]] || ok "Base64 Sub-Store 导入块包含双轨节点"
+        [[ "${import_ok}" -eq 0 ]] || ok "Sub-Store 逐行 JSON 完整"
     else
-        fail "Base64 一键导入块缺失或不可解码"
+        fail "Sub-Store 逐行 JSON 缺失: /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt"
     fi
 
     if [[ -s /etc/landing-ghost/ss-backup-uri.txt ]] && grep -Eq '^ss://.+@.+:[0-9]+#Ghost-Backup-TCP$' /etc/landing-ghost/ss-backup-uri.txt; then

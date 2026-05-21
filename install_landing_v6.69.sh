@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.68.sh — 落地机安装脚本
-# 版本: v6.68 (2026-05-21)
-# v6.68 - 额外生成并打印客户端导入专用 Mihomo Profile，避免把完整运行配置误当节点导入。
+# install_landing_v6.69.sh — 落地机安装脚本
+# 版本: v6.69 (2026-05-21)
+# v6.69 - 删除无效 Base64 导入输出，直接打印 Sub-Store YAML 与逐行 JSON。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.68"
+VERSION="6.69"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
@@ -186,7 +186,7 @@ uninstall() {
         
         if command -v shred >/dev/null 2>&1 && [[ -d "${CONFIG_DIR}" ]]; then
             find "${CONFIG_DIR}" -maxdepth 1 -type f \
-                \( -name 'clash-meta-config.yaml' -o -name 'mihomo-profile.yaml' -o -name 'clash-meta-proxies.yaml' -o -name 'client-config.txt' -o -name 'clash-meta-import-block.txt' -o -name 'clash-meta-subscription.txt' -o -name 'ss-backup-uri.txt' -o -name 'ss-backup-uri-base64.txt' -o -name 'ss-main.json' -o -name 'ss-backup.json' -o -name 'metadata.json' \) \
+                \( -name 'clash-meta-config.yaml' -o -name 'mihomo-profile.yaml' -o -name 'substore-awg-for-mihomo.yaml' -o -name 'substore-awg-for-mihomo-jsonlines.txt' -o -name 'clash-meta-proxies.yaml' -o -name 'clash-meta-substore-nodes.txt' -o -name 'client-config.txt' -o -name 'ss-backup-uri.txt' -o -name 'ss-main.json' -o -name 'ss-backup.json' -o -name 'metadata.json' \) \
                 -exec shred -u -n 1 -z {} \; 2>/dev/null || true
         fi
         rm -rf "${CONFIG_DIR}"
@@ -248,20 +248,26 @@ show_generated_nodes() {
     for f in \
         "${CONFIG_DIR}/clash-meta-config.yaml" \
         "${CONFIG_DIR}/mihomo-profile.yaml" \
+        "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" \
+        "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" \
         "${CONFIG_DIR}/clash-meta-proxies.yaml" \
         "${CONFIG_DIR}/clash-meta-substore-nodes.txt" \
-        "${CONFIG_DIR}/clash-meta-import-block.txt" \
-        "${CONFIG_DIR}/clash-meta-subscription.txt" \
-        "${CONFIG_DIR}/ss-backup-uri.txt" \
-        "${CONFIG_DIR}/ss-backup-uri-base64.txt"; do
+        "${CONFIG_DIR}/ss-backup-uri.txt"; do
         [[ -f "${f}" ]] && printf '  - %s\n' "${f}"
     done
     echo ""
 
-    if [[ -s "${CONFIG_DIR}/clash-meta-import-block.txt" ]]; then
-        echo -e "${YELLOW}Sub-Store 双轨节点 Base64:${NC}"
-        cat "${CONFIG_DIR}/clash-meta-import-block.txt"
+    if [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" ]]; then
+        echo "SUBSTORE_YAML_START"
+        cat "${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
+        echo "SUBSTORE_YAML_END"
         echo ""
+    fi
+
+    if [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" ]]; then
+        echo "SUBSTORE_JSON_START"
+        cat "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
+        echo "SUBSTORE_JSON_END"
         echo ""
     fi
 
@@ -287,12 +293,11 @@ delete_generated_nodes() {
     rm -f \
         "${CONFIG_DIR}/clash-meta-config.yaml" \
         "${CONFIG_DIR}/mihomo-profile.yaml" \
+        "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" \
+        "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" \
         "${CONFIG_DIR}/clash-meta-proxies.yaml" \
         "${CONFIG_DIR}/clash-meta-substore-nodes.txt" \
-        "${CONFIG_DIR}/clash-meta-subscription.txt" \
-        "${CONFIG_DIR}/clash-meta-import-block.txt" \
         "${CONFIG_DIR}/ss-backup-uri.txt" \
-        "${CONFIG_DIR}/ss-backup-uri-base64.txt" \
         "${CONFIG_DIR}/client-config.txt" \
         /usr/local/bin/show-clash-config \
         /usr/local/bin/show-ghost-nodes
@@ -307,7 +312,7 @@ show_landing_menu() {
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo "  [1] 添加/更新节点（重新生成落地机服务与客户端节点）"
-        echo "  [2] 显示已生成节点和 Base64"
+        echo "  [2] 显示已生成 Sub-Store 节点"
         echo "  [3] 删除已生成节点文件（不卸载服务）"
         echo "  [4] 卸载落地机"
         echo "  [5] 退出"
@@ -2443,8 +2448,8 @@ YAML
     chmod 600 "${CONFIG_DIR}/mihomo-profile.yaml"
     success "客户端导入专用 Mihomo Profile 已生成: ${CONFIG_DIR}/mihomo-profile.yaml"
 
-    info "生成 Clash Meta 节点 provider..."
-    cat > "${CONFIG_DIR}/clash-meta-proxies.yaml" <<YAML
+    info "生成 Sub-Store Clash Proxies YAML..."
+    cat > "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" <<YAML
 proxies:
   - name: "AWG-Tunnel"
     type: wireguard
@@ -2486,10 +2491,12 @@ proxies:
     udp: false
     udp-over-tcp: false
 YAML
+    chmod 600 "${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
+    cp "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" "${CONFIG_DIR}/clash-meta-proxies.yaml"
     chmod 600 "${CONFIG_DIR}/clash-meta-proxies.yaml"
-    success "Clash Meta 节点 provider 已生成: ${CONFIG_DIR}/clash-meta-proxies.yaml"
+    success "Sub-Store Clash Proxies YAML 已生成: ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
 
-    info "生成 Sub-Store 逐行节点..."
+    info "生成 Sub-Store 逐行 JSON..."
     {
         jq -nc \
             --arg name "AWG-Tunnel" \
@@ -2555,31 +2562,20 @@ YAML
                 udp: false,
                 "udp-over-tcp": false
             }'
-    } > "${CONFIG_DIR}/clash-meta-substore-nodes.txt"
+    } > "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
+    chmod 600 "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
+    cp "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" "${CONFIG_DIR}/clash-meta-substore-nodes.txt"
     chmod 600 "${CONFIG_DIR}/clash-meta-substore-nodes.txt"
-    success "Sub-Store 逐行节点已生成: ${CONFIG_DIR}/clash-meta-substore-nodes.txt"
+    success "Sub-Store 逐行 JSON 已生成: ${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
+    rm -f "${CONFIG_DIR}/clash-meta-import-block.txt" \
+          "${CONFIG_DIR}/clash-meta-subscription.txt" \
+          "${CONFIG_DIR}/ss-backup-uri-base64.txt"
 
-    # 完整 YAML Base64 保留为文件备份；默认导入块为逐行单节点 JSON，
-    # 便于 Sub-Store 解析出 AWG-Tunnel、主轨、备轨节点。
-    info "生成 Clash Meta Base64 信息..."
-
-    local base64_subscription base64_nodes ss_userinfo ss_uri ss_uri_base64
-    base64_subscription=$(base64 < "${CONFIG_DIR}/clash-meta-config.yaml" | tr -d '\n')
-    printf '%s\n' "${base64_subscription}" > "${CONFIG_DIR}/clash-meta-subscription.txt"
-    chmod 600 "${CONFIG_DIR}/clash-meta-subscription.txt"
-    success "完整 YAML Base64 已生成: ${CONFIG_DIR}/clash-meta-subscription.txt"
-
-    base64_nodes=$(base64 < "${CONFIG_DIR}/clash-meta-substore-nodes.txt" | tr -d '\n')
-    printf '%s\n' "${base64_nodes}" > "${CONFIG_DIR}/clash-meta-import-block.txt"
-    chmod 600 "${CONFIG_DIR}/clash-meta-import-block.txt"
-    success "Sub-Store 双轨节点 Base64 已生成: ${CONFIG_DIR}/clash-meta-import-block.txt"
-
+    local ss_userinfo ss_uri
     ss_userinfo=$(printf '%s:%s' "2022-blake3-aes-256-gcm" "${SS_PASSWORD}" | base64 | tr -d '\n')
     ss_uri="ss://${ss_userinfo}@${TRANSIT_IP}:${TRANSIT_SS_LISTEN_PORT}#Ghost-Backup-TCP"
     printf '%s\n' "${ss_uri}" > "${CONFIG_DIR}/ss-backup-uri.txt"
-    ss_uri_base64=$(printf '%s\n' "${ss_uri}" | base64 | tr -d '\n')
-    printf '%s\n' "${ss_uri_base64}" > "${CONFIG_DIR}/ss-backup-uri-base64.txt"
-    chmod 600 "${CONFIG_DIR}/ss-backup-uri.txt" "${CONFIG_DIR}/ss-backup-uri-base64.txt"
+    chmod 600 "${CONFIG_DIR}/ss-backup-uri.txt"
     success "兼容 SS 备轨 URI 已生成: ${CONFIG_DIR}/ss-backup-uri.txt"
 }
 
@@ -2765,19 +2761,16 @@ EOF
     chmod +x /usr/local/bin/show-clash-config
     success "已创建快捷命令: show-clash-config"
 
-    cat > /usr/local/bin/show-ghost-nodes <<'EOF'
+cat > /usr/local/bin/show-ghost-nodes <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-echo "== Mihomo Profile（客户端导入专用）=="
-cat /etc/landing-ghost/mihomo-profile.yaml 2>/dev/null || true
+echo "SUBSTORE_YAML_START"
+cat /etc/landing-ghost/substore-awg-for-mihomo.yaml 2>/dev/null || true
+echo "SUBSTORE_YAML_END"
 echo
-echo "== Sub-Store 双轨节点 Base64 =="
-cat /etc/landing-ghost/clash-meta-import-block.txt 2>/dev/null || true
-echo
-echo
-echo "== Base64 解码后的逐行节点 JSON =="
-base64 -d /etc/landing-ghost/clash-meta-import-block.txt 2>/dev/null || true
-echo
+echo "SUBSTORE_JSON_START"
+cat /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt 2>/dev/null || true
+echo "SUBSTORE_JSON_END"
 echo
 echo "== 备轨 SS URI =="
 cat /etc/landing-ghost/ss-backup-uri.txt 2>/dev/null || true
@@ -2786,42 +2779,27 @@ EOF
     chmod +x /usr/local/bin/show-ghost-nodes
     success "已创建快捷命令: show-ghost-nodes"
     
-    # 默认先打印客户端导入专用 Profile，再打印 Sub-Store 可解析的逐行节点 JSON Base64。
+    # 默认直接打印 Sub-Store 可用的 YAML 与逐行 JSON。
     echo ""
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}${BOLD}  Mihomo Profile 导入${NC}"
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo "SUBSTORE_YAML_START"
+    cat "${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
+    echo "SUBSTORE_YAML_END"
     echo ""
-    echo -e "${YELLOW}重要提示:${NC}"
-    echo "  1. 下方 YAML 要作为 Mihomo/Clash Meta 的 Profile/配置 导入"
-    echo "  2. 不要粘贴到普通“节点”导入框；主轨依赖 dialer-proxy"
-    echo "  3. Base64 只给 Sub-Store 节点解析入口使用"
+    echo "SUBSTORE_JSON_START"
+    cat "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
+    echo "SUBSTORE_JSON_END"
     echo ""
-    echo -e "${GREEN}${BOLD}Mihomo Profile 从此处开始复制${NC}"
-    echo -e "${RED}↓↓↓↓ MIHOMO_PROFILE_START ↓↓↓↓${NC}"
+    echo "MIHOMO_PROFILE_START"
     cat "${CONFIG_DIR}/mihomo-profile.yaml"
-    echo -e "${RED}↑↑↑↑ MIHOMO_PROFILE_END ↑↑↑↑${NC}"
-    echo ""
-    echo -e "${RED}↓↓↓↓ Sub-Store 双轨节点 Base64 从此处开始复制 ↓↓↓↓${NC}"
-    cat "${CONFIG_DIR}/clash-meta-import-block.txt"
-    echo ""
-    echo -e "${RED}↑↑↑↑ Sub-Store 双轨节点 Base64 复制到此处结束 ↑↑↑↑${NC}"
-    echo ""
-    echo -e "${GREEN}如终端显示不完整，请直接读取文件：${NC}"
-    echo "cat ${CONFIG_DIR}/clash-meta-import-block.txt"
-    echo "cat ${CONFIG_DIR}/clash-meta-import-block.txt | tr -d '\\n'"
-    echo "base64 -d ${CONFIG_DIR}/clash-meta-import-block.txt"
-    echo "cat ${CONFIG_DIR}/ss-backup-uri.txt"
-    echo ""
-    echo -e "${GREEN}${BOLD}完整可运行 Mihomo YAML 备份从此处开始复制${NC}"
-    echo -e "${RED}↓↓↓↓ YAML_START ↓↓↓↓${NC}"
-    cat "${CONFIG_DIR}/clash-meta-config.yaml"
-    echo -e "${RED}↑↑↑↑ YAML_END ↑↑↑↑${NC}"
+    echo "MIHOMO_PROFILE_END"
     echo ""
     echo -e "${RED}⚠️  安全提示：${NC}"
     echo "  - 配置包含敏感信息（密钥、密码），请勿分享给他人"
     echo "  - 混淆参数为静态配置，重装前不会改变（无需重新复制配置）"
+    echo "  - Sub-Store 推荐复制 SUBSTORE_YAML_START/END 之间的内容"
     echo "  - Profile 已保存到: ${CONFIG_DIR}/mihomo-profile.yaml"
+    echo "  - Sub-Store YAML 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
+    echo "  - Sub-Store JSON 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
     echo "  - 完整可运行配置已保存到: ${CONFIG_DIR}/clash-meta-config.yaml"
     echo "  - 安装后验证: curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/verify_installation.sh | bash -s landing"
     echo ""
