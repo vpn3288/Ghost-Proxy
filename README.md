@@ -6,19 +6,19 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.79`
+当前稳定版本：`v6.80`
 
 仓库保留稳定入口和最新审查版本快照。旧版本通过 Git 历史回溯，默认使用无版本后缀的稳定入口。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.79
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.79
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.79
-install_transit_v6.79.sh        # v6.79 中转机版本快照
-install_landing_v6.79.sh        # v6.79 落地机版本快照
-install_amneziawg_dkms_v6.79.sh # v6.79 DKMS 版本快照
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.80
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.80
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.80
+install_transit_v6.80.sh        # v6.80 中转机版本快照
+install_landing_v6.80.sh        # v6.80 落地机版本快照
+install_amneziawg_dkms_v6.80.sh # v6.80 DKMS 版本快照
 dd_debian.sh                    # Debian 12.14 DD 辅助命令生成器，默认不执行
 verify_installation.sh          # 安装后验证脚本
 versions.conf                   # 依赖和上游源码 ref 固定配置
@@ -36,7 +36,7 @@ docs/alternative-solutions.md   # 备用方案评判
 # x86_64 / amd64
 curl -fsSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh | sha256sum
 BIN456789_REINSTALL_SHA256='<上一步得到的sha256>' \
-  bash dd_debian.sh --password 'your-ssh-password' --arch amd64 --port 22 --execute
+  bash dd_debian.sh --arch amd64 --port 22 --execute
 ```
 
 ARM64：
@@ -44,13 +44,13 @@ ARM64：
 ```bash
 curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh | sha256sum
 LEITBOGIORO_REINSTALL_SHA256='<上一步得到的sha256>' \
-  bash dd_debian.sh --password 'your-ssh-password' --arch arm64 --port 22 --execute
+  bash dd_debian.sh --arch arm64 --port 22 --execute
 ```
 
 也可以使用仓库内辅助脚本生成命令。默认只打印，不会执行清盘：
 
 ```bash
-bash dd_debian.sh --password 'your-ssh-password' --arch amd64 --port 22
+bash dd_debian.sh --arch amd64 --port 22
 ```
 
 生产机器建议避免主动 `dist-upgrade` 或更换内核；如追求极稳，可在理解安全更新影响后按架构手动冻结内核元包：
@@ -61,6 +61,12 @@ apt-mark hold linux-image-amd64 linux-headers-amd64
 
 # ARM64
 apt-mark hold linux-image-arm64 linux-headers-arm64
+```
+
+也可以在单独运行 DKMS 脚本时显式选择自动冻结：
+
+```bash
+KERNEL_HOLD=1 bash install_amneziawg_dkms.sh
 ```
 
 ## 安装
@@ -81,6 +87,22 @@ bash <(curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/ins
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/install_amneziawg_dkms.sh)
+```
+
+## Sub-Store / Mihomo
+
+落地机安装完成后，普通用户优先使用：
+
+```bash
+cat /etc/landing-ghost/substore-awg-for-mihomo.yaml
+```
+
+该文件是自洽的 Clash Proxies YAML Provider，包含隐藏的 `AWG-Tunnel`、主轨和备轨。Mihomo 节点列表应只选择 `主轨-UDP极速` 和 `备轨-TCP稳定`，底层 `AWG-Tunnel` 只负责 `dialer-proxy`。
+
+高级基础配置已静态注入 `AWG-Tunnel` 时，才使用：
+
+```bash
+cat /etc/landing-ghost/substore-provider-only.yaml
 ```
 
 ## 版本固定（可选）

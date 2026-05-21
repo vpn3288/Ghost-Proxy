@@ -1,5 +1,16 @@
 # Ghost-Proxy 审核记录
 
+# v6.80 版本 (2026-05-21)
+
+- ✅ 修复 P1：`substore-awg-for-mihomo.yaml` 改为自洽 Clash Proxies Provider，内含 `hidden: true` 的 `AWG-Tunnel`、主轨和备轨，主轨 `dialer-proxy` 不再悬空；同步生成 Base64 和逐行 JSON。
+- ✅ 修复 P1：新增 `substore-provider-only.yaml`（仅给已静态注入 AWG 的高级基础配置使用）和 `substore-mihomo-full.yaml`（完整 Mihomo 模板），避免把 provider 与 JS 常量混成唯一入口。
+- ✅ 修复 P1：落地机 `GHOST_LANDING_INPUT` 每次重建前先删除所有旧 INPUT 跳转，再插入第 1 位，防止 Docker/1Panel 后续宽泛规则压过 Ghost 端口限制。
+- ✅ 修复 P2：`show-ghost-nodes` 和安装完成提示补充 Sub-Store 专用查看命令；`ghost-transit-ctl add-landing` 相同 IP/端口映射重复执行时返回成功并确认 nftables。
+- ✅ 修复 P2：`dd_debian.sh` 不传 `--password` 时改为交互隐藏输入；`install_amneziawg_dkms.sh` 增加显式 `KERNEL_HOLD=1` 内核元包冻结开关，默认不自动冻结。
+- ⚖️ 评判：预编译 `amneziawg-go` / `awg-tools` 的 `versions.conf` URL/SHA 继续留空；当前仓库尚无对应 Release 资产，不能伪造校验值，需发布 tag 并取得真实 SHA256 后再回填。
+- ✅ 新增 `install_landing_v6.80.sh`、`install_transit_v6.80.sh`、`install_amneziawg_dkms_v6.80.sh`，稳定入口同步到 v6.80。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.80.sh`、`install_transit_v6.80.sh`、`install_amneziawg_dkms_v6.80.sh` 均通过。
+
 # v6.79 版本 (2026-05-21)
 
 - ✅ 修复 P0：恢复本地 Base64 导入文件，重新生成 `clash-meta-subscription.txt`（完整 Clash Meta YAML Base64）、`clash-meta-import-block.txt`（Mihomo Profile Base64）和 `ss-backup-uri-base64.txt`，安装完成与 `show-ghost-nodes` 默认提示 Base64 查看命令。

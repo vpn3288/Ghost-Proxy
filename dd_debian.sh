@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.79"
+VERSION="6.80"
 
 usage() {
     cat <<EOF
-用法: bash dd_debian.sh --password <SSH密码> [--arch amd64|arm64] [--port SSH端口] [--execute]
+用法: bash dd_debian.sh [--password <SSH密码>] [--arch amd64|arm64] [--port SSH端口] [--execute]
 
 说明:
   默认只打印推荐 DD 命令，不会清盘。
@@ -21,8 +21,8 @@ usage() {
   arm64: curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh | sha256sum
 
 安全执行示例:
-  BIN456789_REINSTALL_SHA256=<sha256> bash dd_debian.sh --password 'your-password' --arch amd64 --execute
-  LEITBOGIORO_REINSTALL_SHA256=<sha256> bash dd_debian.sh --password 'your-password' --arch arm64 --execute
+  BIN456789_REINSTALL_SHA256=<sha256> bash dd_debian.sh --arch amd64 --execute
+  LEITBOGIORO_REINSTALL_SHA256=<sha256> bash dd_debian.sh --arch arm64 --execute
 EOF
 }
 
@@ -67,7 +67,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -n "${SSH_PASSWORD}" ]] || { usage; die "必须提供 --password"; }
+if [[ -z "${SSH_PASSWORD}" ]]; then
+    if [[ -t 0 ]]; then
+        read -r -s -p "请输入 DD 后 root SSH 密码（不回显）: " SSH_PASSWORD
+        echo
+    else
+        usage
+        die "非交互模式必须提供 --password"
+    fi
+fi
+[[ -n "${SSH_PASSWORD}" ]] || die "SSH 密码不能为空"
 [[ "${SSH_PORT}" =~ ^[0-9]+$ && "${SSH_PORT}" -ge 1 && "${SSH_PORT}" -le 65535 ]] || die "SSH 端口无效: ${SSH_PORT}"
 if [[ "${SSH_PASSWORD}" =~ [\'\"\`\$\\\;\&\|\<\>\(\)] ]]; then
     die "SSH 密码包含不适合嵌入 DD 命令的字符，请换用字母、数字和常见安全标点"
@@ -92,7 +101,7 @@ case "${ARCH}" in
         echo "当前架构: ${ARCH}" >&2
         echo "支持的架构: amd64 (x86_64), arm64 (aarch64)" >&2
         echo "请使用 --arch 参数显式指定，例如:" >&2
-        echo "  bash dd_debian.sh --password '你的SSH密码' --arch amd64" >&2
+        echo "  bash dd_debian.sh --arch amd64" >&2
         die "不支持的架构: ${ARCH}"
         ;;
 esac
