@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.75.sh — 落地机安装脚本
-# 版本: v6.75 (2026-05-21)
-# v6.75 - 默认打印完整可用三段：Mihomo Profile、Sub-Store provider、GHOST_STATIC_PROXIES JS 常量。
+# install_landing_v6.76.sh — 落地机安装脚本
+# 版本: v6.76 (2026-05-21)
+# v6.76 - 三条完整文件查看命令增加用途说明与颜色提示。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.75"
+VERSION="6.76"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
@@ -2902,10 +2902,19 @@ EOF
 cat > /usr/local/bin/show-ghost-nodes <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+NC='\033[0m'
 echo "直接复制下面三条命令查看完整文件："
 echo
+echo -e "${RED}直接导入 Clash Meta / Mihomo 的完整双轨配置：${NC}"
 echo "cat /etc/landing-ghost/mihomo-profile.yaml"
+echo
+echo -e "${BLUE}复制到 Sub-Store 的 provider 节点文件（主轨/备轨）：${NC}"
 echo "cat /etc/landing-ghost/substore-awg-for-mihomo.yaml"
+echo
+echo -e "${GREEN}复制到浏览器分流 JS 的 GHOST_STATIC_PROXIES 常量：${NC}"
 echo "cat /etc/landing-ghost/ghost-static-proxies.js"
 echo
 EOF
@@ -2915,8 +2924,13 @@ EOF
     echo ""
     echo "完整文件查看命令（复制执行即可从头到尾显示）："
     echo ""
+    echo -e "${RED}直接导入 Clash Meta / Mihomo 的完整双轨配置：${NC}"
     echo "cat ${CONFIG_DIR}/mihomo-profile.yaml"
+    echo ""
+    echo -e "${BLUE}复制到 Sub-Store 的 provider 节点文件（主轨/备轨）：${NC}"
     echo "cat ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
+    echo ""
+    echo -e "${GREEN}复制到浏览器分流 JS 的 GHOST_STATIC_PROXIES 常量：${NC}"
     echo "cat ${CONFIG_DIR}/ghost-static-proxies.js"
     echo ""
     echo -e "${RED}⚠️  安全提示：${NC}"

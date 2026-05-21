@@ -1,5 +1,11 @@
 # Ghost-Proxy 审核记录
 
+# v6.76 版本 (2026-05-21)
+
+- ✅ 三条完整文件查看命令增加用途说明：Mihomo 完整双轨配置、Sub-Store provider、浏览器分流 JS 常量。
+- ✅ 用红/蓝/绿区分三类用途，安装完成输出和 `show-ghost-nodes` 保持一致。
+- ✅ 新增 `install_landing_v6.76.sh`、`install_transit_v6.76.sh`、`install_amneziawg_dkms_v6.76.sh`，并清理 v6.75 快照。
+
 # v6.75 版本 (2026-05-21)
 
 - ✅ 落地机安装完成不再默认混合打印三段配置内容，改为打印三条 `cat` 命令，用户复制命令即可完整显示单个文件。
