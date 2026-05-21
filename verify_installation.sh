@@ -16,6 +16,56 @@ require_cmd() {
     command -v "$1" >/dev/null 2>&1 || fail "缺少命令: $1"
 }
 
+has_yaml_top_key() {
+    local key="$1" file="$2"
+    grep -Eq "^${key}:" "${file}"
+}
+
+validate_mihomo_profile_file() {
+    local file="$1" label="$2" full_required="${3:-0}"
+    local ok_flag=1 yaml_key
+
+    for yaml_key in proxies proxy-groups rules; do
+        if ! has_yaml_top_key "${yaml_key}" "${file}"; then
+            fail "${label} 缺少顶层字段: ${yaml_key}:"
+            ok_flag=0
+        fi
+    done
+
+    if [[ "${full_required}" == "1" ]]; then
+        for yaml_key in port socks-port mixed-port; do
+            if ! has_yaml_top_key "${yaml_key}" "${file}"; then
+                fail "${label} 缺少完整 Profile 顶层字段: ${yaml_key}:"
+                ok_flag=0
+            fi
+        done
+    fi
+
+    for yaml_key in AWG-Tunnel amnezia-wg-option dialer-proxy 主轨-UDP极速 备轨-TCP稳定; do
+        if ! grep -Fq "${yaml_key}" "${file}"; then
+            fail "${label} 缺少关键字段: ${yaml_key}"
+            ok_flag=0
+        fi
+    done
+
+    if command -v mihomo >/dev/null 2>&1; then
+        if mihomo -t -f "${file}" >/dev/null 2>&1; then
+            ok "mihomo 可解析 ${label}"
+        else
+            fail "mihomo 无法解析 ${label}"
+            ok_flag=0
+        fi
+    else
+        warn "未安装 mihomo，跳过 ${label} 真实解析测试"
+    fi
+
+    if [[ "${ok_flag}" -eq 1 ]]; then
+        ok "${label} 结构完整"
+        return 0
+    fi
+    return 1
+}
+
 check_service() {
     local service="$1"
     if systemctl is-active --quiet "${service}" 2>/dev/null; then
@@ -123,13 +173,13 @@ verify_landing() {
                     substore_b64_ok=0
                 fi
             done
-            [[ "${substore_b64_ok}" -eq 0 ]] || ok "Sub-Store Provider Base64 可解码且关键字段完整"
+            [[ "${substore_b64_ok}" -eq 0 ]] || warn "Sub-Store Provider Base64 可解码；该文件仅作兼容备份，不作为推荐导入入口"
         else
-            fail "Sub-Store Provider Base64 解码失败"
+            warn "Sub-Store Provider Base64 解码失败；推荐入口是 raw YAML: substore-provider-only.yaml"
         fi
         rm -f "${substore_b64_decoded}"
     else
-        fail "Sub-Store Provider Base64 缺失: /etc/landing-ghost/substore-awg-for-mihomo-base64.txt"
+        warn "Sub-Store Provider Base64 缺失；推荐入口是 raw YAML: substore-provider-only.yaml"
     fi
 
     if [[ -s /etc/landing-ghost/substore-provider-only.yaml ]]; then
@@ -150,10 +200,12 @@ verify_landing() {
     fi
 
     if [[ -s /etc/landing-ghost/substore-import-guide.txt ]] \
+        && grep -Fq "clash-meta-config.yaml" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "substore-provider-only.yaml" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "mihomo-static-awg-proxy.yaml" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "exclude-filter: '^AWG-Tunnel$'" /etc/landing-ghost/substore-import-guide.txt \
-        && grep -Fq "输出格式必须保持 Clash" /etc/landing-ghost/substore-import-guide.txt; then
+        && grep -Fq "输出格式必须保持 Clash" /etc/landing-ghost/substore-import-guide.txt \
+        && grep -Fq "不要使用 Base64 YAML/Profile" /etc/landing-ghost/substore-import-guide.txt; then
         ok "Sub-Store / ClashMeta 导入指南完整"
     else
         fail "Sub-Store / ClashMeta 导入指南缺失或关键提示不完整"
@@ -170,15 +222,6 @@ verify_landing() {
         if awk '/^proxy-groups:/,/^rules:/' /etc/landing-ghost/substore-mihomo-full.yaml | grep -Fq 'AWG-Tunnel'; then
             fail "Sub-Store 完整 Mihomo 模板策略组不应直接展示 AWG-Tunnel"
             substore_full_ok=0
-        fi
-        if command -v mihomo >/dev/null 2>&1; then
-            if mihomo -t -f /etc/landing-ghost/substore-mihomo-full.yaml >/dev/null 2>&1; then
-                ok "mihomo 可解析 Sub-Store 完整 Mihomo 模板"
-            else
-                warn "mihomo 无法解析 Sub-Store 完整 Mihomo 模板（可能是本机 mihomo 版本不支持 AmneziaWG 字段）"
-            fi
-        else
-            warn "未安装 mihomo，跳过 Sub-Store 完整 Mihomo 模板解析测试"
         fi
         [[ "${substore_full_ok}" -eq 0 ]] || ok "Sub-Store 完整 Mihomo 模板完整"
     else
@@ -210,15 +253,15 @@ verify_landing() {
     fi
 
     if [[ -s /etc/landing-ghost/substore-copy.txt ]] \
-        && grep -Fq "===== SUBSTORE_SELF_CONTAINED_YAML_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_SELF_CONTAINED_YAML_END =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_MIHOMO_FULL_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_MIHOMO_FULL_END =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_PROVIDER_ONLY_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_PROVIDER_ONLY_END =====" /etc/landing-ghost/substore-copy.txt; then
-        ok "Sub-Store 复制文件分割标志完整"
+        && grep -Fq "proxies:" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "主轨-UDP极速" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "备轨-TCP稳定" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq 'dialer-proxy: "AWG-Tunnel"' /etc/landing-ghost/substore-copy.txt \
+        && ! grep -Fq 'SUBSTORE_MIHOMO_FULL_START' /etc/landing-ghost/substore-copy.txt \
+        && ! grep -Fq 'name: "AWG-Tunnel"' /etc/landing-ghost/substore-copy.txt; then
+        ok "Sub-Store 复制文件为单一 provider-only YAML"
     else
-        fail "Sub-Store 复制文件缺失或分割标志不完整"
+        fail "Sub-Store 复制文件缺失或仍混入完整 Profile/AWG-Tunnel"
     fi
 
     if [[ -s /etc/landing-ghost/ss-backup-uri.txt ]] && grep -Eq '^ss://.+@.+:[0-9]+#Ghost-Backup-TCP$' /etc/landing-ghost/ss-backup-uri.txt; then
@@ -243,6 +286,7 @@ verify_landing() {
             fi
         done
         [[ "${yaml_ok}" -eq 0 ]] || ok "Mihomo YAML 关键字段完整"
+        validate_mihomo_profile_file /etc/landing-ghost/clash-meta-config.yaml "Mihomo raw YAML 完整配置" 1 || true
     else
         fail "Mihomo YAML 配置缺失: /etc/landing-ghost/clash-meta-config.yaml"
     fi
@@ -251,13 +295,8 @@ verify_landing() {
         local decoded decoded_ok=1
         decoded=$(mktemp)
         if base64 -d /etc/landing-ghost/clash-meta-subscription.txt > "${decoded}" 2>/dev/null; then
-            for yaml_key in AWG-Tunnel amnezia-wg-option dialer-proxy 主轨-UDP极速 备轨-TCP稳定; do
-                if ! grep -Fq "${yaml_key}" "${decoded}"; then
-                    fail "完整 YAML Base64 解码后缺少: ${yaml_key}"
-                    decoded_ok=0
-                fi
-            done
-            [[ "${decoded_ok}" -eq 0 ]] || ok "完整 YAML Base64 可解码且关键字段完整"
+            validate_mihomo_profile_file "${decoded}" "完整 YAML Base64 解码内容" 1 || decoded_ok=0
+            [[ "${decoded_ok}" -eq 0 ]] || ok "完整 YAML Base64 可解码"
         else
             fail "完整 YAML Base64 解码失败: /etc/landing-ghost/clash-meta-subscription.txt"
         fi
@@ -270,13 +309,8 @@ verify_landing() {
         local profile_decoded profile_decoded_ok=1
         profile_decoded=$(mktemp)
         if base64 -d /etc/landing-ghost/clash-meta-import-block.txt > "${profile_decoded}" 2>/dev/null; then
-            for yaml_key in AWG-Tunnel amnezia-wg-option dialer-proxy 主轨-UDP极速 备轨-TCP稳定; do
-                if ! grep -Fq "${yaml_key}" "${profile_decoded}"; then
-                    fail "Mihomo Profile Base64 解码后缺少: ${yaml_key}"
-                    profile_decoded_ok=0
-                fi
-            done
-            [[ "${profile_decoded_ok}" -eq 0 ]] || ok "Mihomo Profile Base64 可解码且关键字段完整"
+            validate_mihomo_profile_file "${profile_decoded}" "Mihomo Profile Base64 解码内容" 0 || profile_decoded_ok=0
+            [[ "${profile_decoded_ok}" -eq 0 ]] || ok "Mihomo Profile Base64 可解码"
         else
             fail "Mihomo Profile Base64 解码失败: /etc/landing-ghost/clash-meta-import-block.txt"
         fi

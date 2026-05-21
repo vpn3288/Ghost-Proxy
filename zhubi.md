@@ -1,5 +1,14 @@
 # Ghost-Proxy 审核记录
 
+# v6.88 版本 (2026-05-21)
+
+- ✅ 修复 P0：默认导入入口改为 Mihomo raw YAML（`clash-meta-config.yaml`）与 Sub-Store raw provider-only（`substore-provider-only.yaml`）；Base64 仅标注为 Mihomo 完整 Profile 兼容备用，明确禁止粘贴到 Sub-Store。
+- ✅ 修复 P0：`substore-copy.txt` 不再混合自洽 Provider、完整 Profile 和 provider-only 三段内容，改为单一 provider-only YAML，避免整段粘贴后 Sub-Store 0 节点。
+- ✅ 增强验证：`verify_installation.sh` 增加 Mihomo 完整配置顶层字段检查（`port/socks-port/mixed-port/proxies/proxy-groups/rules`），本机存在 `mihomo` 时对 raw YAML 与 Base64 解码内容执行 `mihomo -t -f`。
+- ✅ 修复 P1：失败恢复服务的 EXIT trap 进入后先 `trap - EXIT`，避免恢复逻辑再次触发自身。
+- ✅ 新增 `install_landing_v6.88.sh`、`install_transit_v6.88.sh`、`install_amneziawg_dkms_v6.88.sh`，稳定入口同步到 v6.88。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.88.sh`、`install_transit_v6.88.sh`、`install_amneziawg_dkms_v6.88.sh` 均通过；本地非实机环境执行 `verify_installation.sh landing/transit` 因缺少 `/etc/landing-ghost`、`/etc/ghost-transit`、`jq`、`nft` 与 systemd 服务失败，未记为实机验证通过。
+
 # v6.87 版本 (2026-05-21)
 
 - ✅ 修复 P1：`substore-import-guide.txt` 与 README 明确 Sub-Store 输出必须保持 Clash 格式，不要转 Surge/Stash/Sing-box；补充 provider `health-check`、策略组 `exclude-filter` 和 Base64/Provider/Profile 不混用提示。
