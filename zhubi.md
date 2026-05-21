@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.65 版本 (2026-05-21)
+
+- ✅ 新增 `install_landing_v6.65.sh`、`install_transit_v6.65.sh`、`install_amneziawg_dkms_v6.65.sh`，并同步稳定入口到 v6.65。
+- ✅ 中转机已安装后再次运行脚本会进入管理菜单：查看状态、添加落地机映射、重新生成 nftables 规则、卸载、继续安装/更新、退出。
+- ✅ 管理菜单复用 `ghost-transit-ctl status/add-landing/reload-rules`，中转机仍保持纯 nftables，不引入任何应用层代理。
+- ✅ 实机菜单测试：中转机再次运行 v6.65 脚本选择“查看中转状态”正常显示双落地映射，未触发重装；随后 `verify_installation.sh transit` 仍为 0 警告。
+
 # v6.64 版本 (2026-05-21)
 
 - ✅ 新增 `install_landing_v6.64.sh`、`install_transit_v6.64.sh`、`install_amneziawg_dkms_v6.64.sh`，并同步稳定入口到 v6.64。
