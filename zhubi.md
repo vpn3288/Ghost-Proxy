@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.85 版本 (2026-05-21)
+
+- ✅ 修复 P1：`amneziawg-go` 上游 `go.mod` 已要求 Go 1.24.4，本轮新增固定 Go 工具链版本与 amd64/arm64 SHA256，落地机源码回退在 Go 版本不足时下载校验后使用 `/opt/ghost-go/go1.24.4` 编译。
+- ✅ 修复 P1：`build-awg.yml` 不再用 Debian 12 的 `golang-go=2:1.19~1` 编译 amneziawg-go，改为下载并校验官方 Go 1.24.4 tarball；`pkg-config/libmnl-dev` 仍优先使用固定 Debian 包版本。
+- ✅ 新增 `install_landing_v6.85.sh`、`install_transit_v6.85.sh`、`install_amneziawg_dkms_v6.85.sh`，稳定入口同步到 v6.85。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.85.sh`、`install_transit_v6.85.sh`、`install_amneziawg_dkms_v6.85.sh` 均通过；`dd_debian.sh --arch amd64/arm64` 纯打印模式通过。
+
 # v6.84 版本 (2026-05-21)
 
 - ✅ 修复 P1：`build-awg.yml` 的 awg-tools 打包改为 `make install` 到临时根目录后打包 `awg/awg-quick`，避免源码目录没有 `awg-quick` 导致 tag 构建失败。

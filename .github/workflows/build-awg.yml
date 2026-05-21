@@ -41,19 +41,30 @@ jobs:
               set -euo pipefail
               . ./versions.conf
               apt-get update -qq
-              base_packages=(ca-certificates git build-essential bash make tar)
+              tmp_dir="$(mktemp -d)"
+              trap "rm -rf ${tmp_dir}" EXIT
+              base_packages=(ca-certificates curl git build-essential bash make tar)
               if ! DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
                 "${base_packages[@]}" \
-                "golang-go=${GOLANG_VERSION}" \
                 "pkg-config=${PKG_CONFIG_VERSION}" \
                 "libmnl-dev=${LIBMNL_DEV_VERSION}"; then
                 echo "Pinned build dependencies unavailable; falling back to Debian 12 defaults" >&2
                 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-                  "${base_packages[@]}" golang-go pkg-config libmnl-dev
+                  "${base_packages[@]}" pkg-config libmnl-dev
               fi
 
-              tmp_dir="$(mktemp -d)"
-              trap "rm -rf ${tmp_dir}" EXIT
+              case "${{ matrix.arch }}" in
+                amd64) go_sha="${GO_TOOLCHAIN_SHA256_AMD64}" ;;
+                arm64) go_sha="${GO_TOOLCHAIN_SHA256_ARM64}" ;;
+                *) echo "Unsupported arch: ${{ matrix.arch }}" >&2; exit 1 ;;
+              esac
+              go_archive="go${GO_TOOLCHAIN_VERSION}.linux-${{ matrix.arch }}.tar.gz"
+              curl -fsSL --retry 3 "https://go.dev/dl/${go_archive}" -o "${tmp_dir}/${go_archive}"
+              printf "%s  %s\n" "${go_sha}" "${tmp_dir}/${go_archive}" | sha256sum -c -
+              rm -rf /usr/local/go
+              tar -C /usr/local -xzf "${tmp_dir}/${go_archive}"
+              export PATH="/usr/local/go/bin:${PATH}"
+              go version
 
               git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-go.git "${tmp_dir}/amneziawg-go"
               git -C "${tmp_dir}/amneziawg-go" fetch --depth 1 origin "${AWG_GO_REF}"
