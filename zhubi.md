@@ -1,5 +1,14 @@
 # Ghost-Proxy 审核记录
 
+# v6.75 版本 (2026-05-21)
+
+- ✅ 落地机安装完成不再默认混合打印三段配置内容，改为打印三条 `cat` 命令，用户复制命令即可完整显示单个文件。
+- ✅ 新增 `/etc/landing-ghost/ghost-static-proxies.js`，内容是完整 `const GHOST_STATIC_PROXIES = [...]` 常量，可直接替换浏览器分流 JS 对应区块。
+- ✅ `show-ghost-nodes` 改为只输出三条完整文件查看命令，避免终端滚动导致用户误复制半截片段。
+- ✅ `verify_installation.sh` 增加 `ghost-static-proxies.js` 与新分割标志检查。
+- ✅ ARM 落地机 `132.145.191.90` 实机重建节点后确认：`show-ghost-nodes` 只打印三条命令，新版验证 0 警告。
+- ✅ 新增 `install_landing_v6.75.sh`、`install_transit_v6.75.sh`、`install_amneziawg_dkms_v6.75.sh`，并清理 v6.74 快照。
+
 # v6.74 版本 (2026-05-21)
 
 - ✅ 新增 `mihomo-static-awg-proxy.js`：输出可直接粘贴到浏览器分流 JS `GHOST_STATIC_PROXIES` 的 AWG-Tunnel JSON 对象。

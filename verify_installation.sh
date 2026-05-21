@@ -91,6 +91,15 @@ verify_landing() {
         fail "GHOST_STATIC_PROXIES JS 对象缺失: /etc/landing-ghost/mihomo-static-awg-proxy.js"
     fi
 
+    if [[ -s /etc/landing-ghost/ghost-static-proxies.js ]] \
+        && grep -Fq 'const GHOST_STATIC_PROXIES = [' /etc/landing-ghost/ghost-static-proxies.js \
+        && grep -Fq '"name": "AWG-Tunnel"' /etc/landing-ghost/ghost-static-proxies.js \
+        && grep -Fq '];' /etc/landing-ghost/ghost-static-proxies.js; then
+        ok "GHOST_STATIC_PROXIES JS 常量完整"
+    else
+        fail "GHOST_STATIC_PROXIES JS 常量缺失或格式异常: /etc/landing-ghost/ghost-static-proxies.js"
+    fi
+
     if [[ -s /etc/landing-ghost/substore-awg-for-mihomo.yaml ]]; then
         local substore_yaml_ok=1
         for yaml_key in 主轨-UDP极速 备轨-TCP稳定 dialer-proxy; do
@@ -132,8 +141,8 @@ verify_landing() {
     if [[ -s /etc/landing-ghost/substore-copy.txt ]] \
         && grep -Fq "===== SUBSTORE_PROVIDER_YAML_START =====" /etc/landing-ghost/substore-copy.txt \
         && grep -Fq "===== SUBSTORE_PROVIDER_YAML_END =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== GHOST_STATIC_PROXIES_JS_OBJECT_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== GHOST_STATIC_PROXIES_JS_OBJECT_END =====" /etc/landing-ghost/substore-copy.txt; then
+        && grep -Fq "===== GHOST_STATIC_PROXIES_JS_START =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== GHOST_STATIC_PROXIES_JS_END =====" /etc/landing-ghost/substore-copy.txt; then
         ok "Sub-Store 复制文件分割标志完整"
     else
         fail "Sub-Store 复制文件缺失或分割标志不完整"

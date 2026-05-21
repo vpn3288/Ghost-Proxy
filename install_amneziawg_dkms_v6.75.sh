@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.74"
+VERSION="6.75"
 MODULE_NAME="amneziawg"
 DEFAULT_REPO_URL="https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git"
 # AmneziaWG upstream source refs pinned on 2026-05-20 for reproducible builds.
