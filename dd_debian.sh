@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.89"
+VERSION="6.90"
 
 usage() {
     cat <<EOF
@@ -129,6 +129,7 @@ Ghost-Proxy DD 辅助脚本 v${VERSION}
 推荐系统基线:
   Debian 12 Bookworm minimal（12.14 是 Ghost-Proxy 已验证排障基线）
   DD 参数统一使用 Debian 12；上游脚本/镜像决定实际点版本，不保证固定到 12.14。
+  已验证组合记录项: Debian 点版本、uname -r、linux-headers-\$(uname -r)、DKMS modprobe amneziawg 结果。
 
 目标架构:
   ${ARCH}
@@ -154,6 +155,7 @@ DD 完成后验证:
   该 DD 命令只固定 Debian 12，不保证固定到 12.14。
   若 cat /etc/debian_version 不是 12.14，仍可测试；如遇 DKMS 问题，请先记录 cat /etc/debian_version 和 uname -r。
   请确认 apt 源可用并补齐 headers/dkms/gcc-12 后，再运行 Ghost-Proxy 脚本。
+  若 linux-headers-\$(uname -r) 不存在，不要为了 DKMS 强行换内核；落地机脚本会回退 amneziawg-go。
 EOF
 
 if [[ "${EXECUTE}" != "1" ]]; then

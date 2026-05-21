@@ -83,17 +83,17 @@ check_os() {
 # P1-2: 应用层代理检测（防止中转机误配代理导致流量泄漏）
 check_no_proxy() {
     info "检查应用层代理配置..."
-    
+
     # 检查环境变量
     if [[ -n "${http_proxy:-}" ]] || [[ -n "${https_proxy:-}" ]] || [[ -n "${HTTP_PROXY:-}" ]] || [[ -n "${HTTPS_PROXY:-}" ]]; then
         die "检测到应用层代理环境变量！中转机不应配置代理，请执行: unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY"
     fi
-    
+
     # 检查常见代理配置文件
     if [[ -f /etc/environment ]] && grep -qiE '(http|https)_proxy' /etc/environment; then
         die "检测到 /etc/environment 中配置了代理，请删除后重试"
     fi
-    
+
     success "应用层代理检查通过"
 }
 
@@ -102,18 +102,18 @@ check_disk_space() {
     local required_mb=100
     local available_mb
     available_mb=$(df -m / | awk 'NR==2 {print $4}')
-    
+
     if [[ ${available_mb} -lt ${required_mb} ]]; then
         die "磁盘空间不足！需要至少 ${required_mb}MB，当前可用 ${available_mb}MB"
     fi
-    
+
     info "磁盘空间检查通过（可用: ${available_mb}MB）"
 }
 
 # v6.9 增强-3: 网络连通性检查
 check_network() {
     info "检查网络连通性..."
-    
+
     # 检查 DNS 解析
     if command -v getent >/dev/null 2>&1; then
         if ! getent ahosts ifconfig.me &>/dev/null && ! getent ahosts google.com &>/dev/null; then
@@ -128,7 +128,7 @@ check_network() {
     else
         warn "缺少 getent/host，跳过 DNS 解析预检"
     fi
-    
+
     success "网络连通性检查通过"
     return 0
 }
@@ -136,27 +136,27 @@ check_network() {
 # v6.12 新增: 依赖安装函数
 install_dependencies() {
     progress 1 7 "安装依赖包"
-    
+
     info "更新软件包列表..."
     if ! retry_command 3 5 apt-get update -qq; then
         warn "apt-get update 失败，但继续尝试安装"
     fi
-    
+
     local packages=(jq nftables iproute2 iputils-ping coreutils util-linux)
     local missing_packages=()
-    
+
     # 检查哪些包需要安装
     for pkg in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $pkg "; then
             missing_packages+=("$pkg")
         fi
     done
-    
+
     if [[ ${#missing_packages[@]} -eq 0 ]]; then
         success "所有依赖包已安装"
         return 0
     fi
-    
+
     info "安装依赖包: ${missing_packages[*]}"
     if retry_command 3 5 env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing_packages[@]}" &>/dev/null; then
         success "依赖包安装完成"
@@ -171,7 +171,7 @@ check_kernel_version() {
     local major minor
     major=$(echo "${kernel_version}" | cut -d. -f1)
     minor=$(echo "${kernel_version}" | cut -d. -f2)
-    
+
     if [[ ${major} -lt 4 ]] || [[ ${major} -eq 4 && ${minor} -lt 9 ]]; then
         warn "内核版本 ${kernel_version} 不支持 BBR（需要 4.9+）"
         return 1
@@ -279,10 +279,10 @@ cleanup_old_backups() {
 
 init_config() {
     progress 1 6 "初始化配置目录"
-    
+
     mkdir -p "${CONFIG_DIR}"
     chmod 700 "${CONFIG_DIR}"
-    
+
     local ssh_port
     ssh_port=$(detect_ssh_port)
 
@@ -309,7 +309,7 @@ init_config() {
         cp "${CONFIG_FILE}" "${CONFIG_FILE}.bak.$(date +%s)"
         cleanup_old_backups "${CONFIG_FILE}"
     fi
-    
+
     cat > "${CONFIG_FILE}" <<EOF
 {
   "version": "${VERSION}",
@@ -317,31 +317,31 @@ init_config() {
   "landings": []
 }
 EOF
-    
+
     chmod 600 "${CONFIG_FILE}"
-    
+
     # v6.9 增强-2: 配置文件完整性检查
     if ! validate_config_file "${CONFIG_FILE}"; then
         die "配置文件生成失败，JSON 格式错误"
     fi
-    
+
     success "配置文件已创建: ${CONFIG_FILE}"
 }
 
 # v6.9 增强-2: 配置文件完整性检查
 validate_config_file() {
     local file="$1"
-    
+
     if [[ ! -f "${file}" ]]; then
         error "配置文件不存在: ${file}"
         return 1
     fi
-    
+
     if ! jq empty "${file}" 2>/dev/null; then
         error "配置文件 JSON 格式错误"
         return 1
     fi
-    
+
     # 检查必需字段
     local required_fields=("version" "ssh_port" "landings")
     for field in "${required_fields[@]}"; do
@@ -350,7 +350,7 @@ validate_config_file() {
             return 1
         fi
     done
-    
+
     return 0
 }
 
@@ -427,7 +427,7 @@ add_landing() {
         error "请在落地机脚本中修改“中转机 SS 备轨监听端口”，或重跑菜单的“修正中转端口并重新生成节点”。"
         return 1
     fi
-    
+
     # 使用 jq 添加或更新落地机（带错误检查）
     local tmp_file="${CONFIG_FILE}.tmp.$$"
     if ! jq --arg ip "$ip" --arg name "$name" --argjson ssh_port "$ssh_port" \
@@ -455,16 +455,16 @@ add_landing() {
         rm -f "${tmp_file}"
         return 1
     fi
-    
+
     # 验证生成的 JSON 格式
     if ! jq empty "${tmp_file}" 2>/dev/null; then
         error "生成的配置文件格式错误"
         rm -f "${tmp_file}"
         return 1
     fi
-    
+
     mv "${tmp_file}" "${CONFIG_FILE}"
-    
+
     success "已添加落地机: ${name} (${ip})，监听 ${awg_listen}/udp→${awg_target}, ${ss_listen}/tcp→${ss_target}"
 }
 
@@ -477,17 +477,17 @@ test_connectivity() {
     info "测试落地机连通性（并行测试）..."
     local landings_count
     landings_count=$(jq '.landings | length' "${CONFIG_FILE}")
-    
+
     if [[ ${landings_count} -eq 0 ]]; then
         warn "没有配置落地机，跳过连通性测试"
         return 0
     fi
-    
+
     local success_count=0
     local fail_count=0
     local temp_dir="/tmp/ghost-transit-test-$$"
     mkdir -p "${temp_dir}"
-    
+
     # 并行测试所有落地机
     local pids=()
     for ((i=0; i<landings_count; i++)); do
@@ -509,7 +509,7 @@ test_connectivity() {
         ) &
         pids+=($!)
     done
-    
+
     local timeout=20
     local deadline=$(( $(date +%s) + timeout ))
     local pid
@@ -526,7 +526,7 @@ test_connectivity() {
         done
     done
     wait 2>/dev/null || true
-    
+
     # 收集结果
     for ((i=0; i<landings_count; i++)); do
         if [[ -f "${temp_dir}/${i}.result" ]]; then
@@ -534,7 +534,7 @@ test_connectivity() {
             result=$(cat "${temp_dir}/${i}.result")
             local status name ip
             IFS=':' read -r status name ip <<< "${result}"
-            
+
             if [[ "${status}" == "SUCCESS" ]]; then
                 success "${name} (${ip}) 连通正常"
                 success_count=$((success_count + 1))
@@ -544,10 +544,10 @@ test_connectivity() {
             fi
         fi
     done
-    
+
     # 清理临时文件
     rm -rf "${temp_dir}"
-    
+
     echo ""
     if [[ ${fail_count} -eq 0 ]]; then
         success "所有落地机连通性测试通过 (${success_count}/${landings_count})"
@@ -564,18 +564,18 @@ test_connectivity() {
 # v6.9 增强-4: 改进输入验证（防止命令注入）
 validate_ip() {
     local ip="$1"
-    
+
     # 检查是否包含特殊字符
     if [[ "${ip}" =~ [\;\$\`\&\|\<\>\(\)\{\}\[\]\\] ]]; then
         error "IP 地址包含非法字符"
         return 1
     fi
-    
+
     # 检查 IP 格式
     if [[ ! "${ip}" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         return 1
     fi
-    
+
     # 检查每个八位组的范围
     local IFS='.'
     local -a octets=(${ip})
@@ -646,7 +646,7 @@ ask_landings() {
     echo -e "${BOLD}  配置落地机${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    
+
     local count=0
     while true; do
         echo ""
@@ -655,7 +655,7 @@ ask_landings() {
         else
             echo -e "${GREEN}已添加 ${count} 个落地机${NC}"
         fi
-        
+
         read -p "$(echo -e ${CYAN}"继续添加落地机? (y/n): "${NC})" choice
         if [[ "${choice}" != "y" ]] && [[ "${choice}" != "Y" ]]; then
             if [[ ${count} -eq 0 ]]; then
@@ -664,7 +664,7 @@ ask_landings() {
             fi
             break
         fi
-        
+
         while true; do
             read -p "$(echo -e ${CYAN}"落地机 IP 地址: "${NC})" ip
             if validate_ip "${ip}"; then
@@ -673,47 +673,47 @@ ask_landings() {
                 warn "IP 地址格式错误，请重新输入"
             fi
         done
-        
+
         read -p "$(echo -e ${CYAN}"落地机名称 (可选，回车跳过): "${NC})" name
         if [[ -z "${name}" ]]; then
             name="landing-$((count + 1))"
         fi
-        
+
         read -p "$(echo -e ${CYAN}"落地机 SSH 端口 (默认 22): "${NC})" ssh_port
         ssh_port=${ssh_port:-22}
         if ! validate_port "${ssh_port}"; then
             warn "SSH 端口无效，使用默认 22"
             ssh_port=22
         fi
-        
+
         local awg_listen awg_target ss_listen ss_target
         awg_listen=$((51820 + count))
         ss_listen=$((8389 + count))
         awg_target=51820
         ss_target=8389
-        
+
         awg_listen=$(read_free_port_loop "AWG 中转监听端口" "${awg_listen}" "udp")
-        
+
         read -p "$(echo -e ${CYAN}"AWG 落地目标端口 (默认 ${awg_target}): "${NC})" input_port
         awg_target=${input_port:-${awg_target}}
         while ! validate_port "${awg_target}"; do
             warn "端口号无效，请重新输入"
             read -p "$(echo -e ${CYAN}"AWG 落地目标端口: "${NC})" awg_target
         done
-        
+
         ss_listen=$(read_free_port_loop "SS 中转监听端口" "${ss_listen}" "tcp")
-        
+
         read -p "$(echo -e ${CYAN}"SS 落地目标端口 (默认 ${ss_target}): "${NC})" input_port
         ss_target=${input_port:-${ss_target}}
         while ! validate_port "${ss_target}"; do
             warn "端口号无效，请重新输入"
             read -p "$(echo -e ${CYAN}"SS 落地目标端口: "${NC})" ss_target
         done
-        
+
         add_landing "${ip}" "${name}" "${ssh_port}" "${awg_listen}" "${awg_target}" "${ss_listen}" "${ss_target}"
         count=$((count + 1))
     done
-    
+
     success "落地机配置完成，共 ${count} 个"
 }
 
@@ -738,19 +738,19 @@ optimize_system() {
     progress 2 6 "优化系统参数"
 
     disable_ifupdown_ipv6_stanzas
-    
+
     if [[ -f /etc/sysctl.d/99-transit-ghost.conf ]]; then
         warn "检测到已有配置，将覆盖"
         cp /etc/sysctl.d/99-transit-ghost.conf /etc/sysctl.d/99-transit-ghost.conf.bak.$(date +%s)
         cleanup_old_backups "/etc/sysctl.d/99-transit-ghost.conf"
     fi
-    
+
     local enable_bbr=1
     if ! check_kernel_version; then
         enable_bbr=0
         warn "将使用默认拥塞控制算法（cubic）"
     fi
-    
+
     cat > /etc/sysctl.d/99-transit-ghost.conf <<EOF
 # IP 转发（必需）
 net.ipv4.ip_forward = 1
@@ -762,7 +762,7 @@ net.ipv6.conf.all.forwarding = 0
 net.ipv6.conf.default.forwarding = 0
 
 EOF
-    
+
     if [[ ${enable_bbr} -eq 1 ]]; then
         cat >> /etc/sysctl.d/99-transit-ghost.conf <<EOF
 # BBR 拥塞控制（CN2 GIA 优化）
@@ -771,24 +771,24 @@ net.ipv4.tcp_congestion_control = bbr
 
 EOF
     fi
-    
+
 cat >> /etc/sysctl.d/99-transit-ghost.conf <<EOF
 net.ipv4.tcp_slow_start_after_idle = 0
 EOF
-    
+
     if sysctl -p /etc/sysctl.d/99-transit-ghost.conf &>/dev/null; then
         log "INFO" "系统参数已应用"
     else
         warn "部分系统参数应用失败，检查关键参数..."
     fi
-    
+
     local ip_forward
     ip_forward=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo "0")
     if [[ "${ip_forward}" != "1" ]]; then
         die "IP 转发未启用，请手动执行: sysctl -w net.ipv4.ip_forward=1"
     fi
     success "IP 转发已启用"
-    
+
     if [[ ${enable_bbr} -eq 1 ]]; then
         local current_cc
         current_cc=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo "unknown")
@@ -798,7 +798,7 @@ EOF
             warn "BBR 启用失败，当前算法: ${current_cc}"
         fi
     fi
-    
+
     success "系统优化完成"
 }
 
@@ -862,7 +862,7 @@ disable_ifupdown_ipv6_stanzas() {
 
 setup_logrotate() {
     progress 3 6 "配置日志轮转"
-    
+
     cat > /etc/logrotate.d/ghost-transit <<EOF
 ${LOG_FILE} {
     daily
@@ -875,7 +875,7 @@ ${LOG_FILE} {
     sharedscripts
 }
 EOF
-    
+
     success "日志轮转配置完成"
 }
 
@@ -904,13 +904,13 @@ setup_nftables() {
 
 install_management_tool() {
     progress 5 6 "安装管理工具"
-    
+
     # v6.9 增强-6: 强制覆盖管理工具（解决版本不一致问题）
     if [[ -f /usr/local/bin/ghost-transit-ctl ]]; then
         info "检测到旧版本管理工具，强制更新..."
         rm -f /usr/local/bin/ghost-transit-ctl
     fi
-    
+
     cat > /usr/local/bin/ghost-transit-ctl <<'CTLEOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -1077,21 +1077,21 @@ cmd_reload_rules() {
         return 0
     fi
     printf '%s\n' "$$" > "${lock_file}" 2>/dev/null || true
-    
+
     echo "重新生成并加载 nftables 规则..."
     mkdir -p "$(dirname "${NFT_RULES}")"
-    
+
     # 备份当前规则
     if [[ -f "${NFT_RULES}" ]]; then
         cp "${NFT_RULES}" "${NFT_RULES}.bak.$(date +%s)"
         cleanup_old_backups "${NFT_RULES}"
     fi
-    
+
     # v5.7 精简：直接检测网络接口，删除冗余的缓存逻辑
     # 原因：Debian 12 (Linux 6.1+) 绝对支持 Flowtable，无需复杂的缓存检测
     local main_iface
     main_iface=$(ip route show default | awk '/default/ {print $5; exit}')
-    
+
     local use_flowtable=true
     if [[ -z "${main_iface}" ]]; then
         use_flowtable=false
@@ -1107,7 +1107,7 @@ cmd_reload_rules() {
                 ;;
         esac
     fi
-    
+
     # 先验证 config.json，避免损坏配置进入 jq 规则生成阶段。
     if ! jq empty "${CONFIG_FILE}" 2>/dev/null; then
         echo "✗ 配置文件 JSON 格式错误: ${CONFIG_FILE}"
@@ -1128,26 +1128,26 @@ cmd_reload_rules() {
     # 获取 SSH 端口
     local ssh_port
     ssh_port=$(jq -r '.ssh_port' "${CONFIG_FILE}")
-    
+
     # 使用 jq 生成完整的 nftables 规则（P0 修复：添加错误检测）
     local nft_content
     local tmp_rules="${NFT_RULES}.tmp.$$"
     trap "rm -f '${tmp_rules}'" EXIT
-    
+
     if ! nft_content=$(jq -r --arg ssh "${ssh_port}" --arg iface "${main_iface}" --argjson use_ft $(${use_flowtable} && echo "true" || echo "false") '
         def forward_rules:
             [.landings[] | select(.enabled == true) as $landing |
              $landing.ports[]? | "        ip daddr \($landing.ip) \(.proto) dport \(.target) accept"] | join("\n");
-        
+
         def dnat_rules:
             [.landings[] | select(.enabled == true) as $landing |
              $landing.ports[]? | "        \(.proto) dport \(.listen) dnat ip to \($landing.ip):\(.target)"] | join("\n");
-        
+
         # 仅对启用落地机的转发端口做 SNAT，避免影响共机或多网卡上的非 Ghost-Proxy 流量。
         def masquerade_rules:
             [.landings[] | select(.enabled == true) as $landing |
              $landing.ports[]? | "        ip daddr \($landing.ip) \(.proto) dport \(.target) masquerade"] | join("\n");
-        
+
         "#!/usr/sbin/nft -f\n" +
         "# Ghost-Proxy nftables rules\n\n" +
         "table inet ghost_proxy_filter {\n" +
@@ -1194,17 +1194,17 @@ cmd_reload_rules() {
         rm -f "${tmp_rules}"
         return 1
     fi
-    
+
     # 检查生成的内容是否为空
     if [[ -z "${nft_content}" ]]; then
         echo "✗ 生成的规则为空，config.json 可能已损坏"
         rm -f "${tmp_rules}"
         return 1
     fi
-    
+
     # 写入临时文件（P0 修复：使用临时文件，使用 printf 正确处理转义字符）
     printf '%s' "${nft_content}" > "${tmp_rules}"
-    
+
     if check_ghost_rules "${tmp_rules}" && load_ghost_rules "${tmp_rules}"; then
         mv "${tmp_rules}" "${NFT_RULES}"
         echo "✓ 规则重新生成并加载成功"
@@ -1242,7 +1242,7 @@ cmd_add_landing() {
     local awg_target=51820
     local ss_listen=8389
     local ss_target=8389
-    
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --awg-listen) awg_listen="${2:-}"; shift 2 ;;
@@ -1252,19 +1252,19 @@ cmd_add_landing() {
             *) echo "✗ 未知参数: $1"; exit 1 ;;
         esac
     done
-    
+
     if ! validate_ip "${ip}"; then
         echo "✗ 无效的 IP 地址: ${ip}"
         exit 1
     fi
-    
+
     for port in "$ssh_port" "$awg_listen" "$awg_target" "$ss_listen" "$ss_target"; do
         if ! [[ "${port}" =~ ^[0-9]+$ ]] || [[ ${port} -lt 1 ]] || [[ ${port} -gt 65535 ]]; then
             echo "✗ 无效的端口号: ${port}"
             exit 1
         fi
     done
-    
+
     if jq -e --arg ip "$ip" \
        '[.landings[]? | select(.ip == $ip)] | length > 0' \
        "${CONFIG_FILE}" >/dev/null; then
@@ -1326,7 +1326,7 @@ cmd_add_landing() {
         echo "  请修改参数: --ss-listen ${ss_listen}"
         exit 1
     fi
-    
+
     local tmp_config="${CONFIG_FILE}.tmp.$$"
     if ! jq --arg ip "$ip" --arg name "$name" --argjson ssh_port "$ssh_port" \
        --argjson awg_listen "$awg_listen" --argjson awg_target "$awg_target" \
@@ -1356,7 +1356,7 @@ cmd_add_landing() {
     fi
     mv "${tmp_config}" "${CONFIG_FILE}"
     chmod 600 "${CONFIG_FILE}"
-    
+
     echo "✓ 已添加落地机: ${name} (${ip}:${ssh_port})"
     echo "  - ${awg_listen}/udp -> ${ip}:${awg_target}"
     echo "  - ${ss_listen}/tcp -> ${ip}:${ss_target}"
@@ -1405,7 +1405,7 @@ case "${1:-help}" in
     *) echo "未知命令: $1"; cmd_help; exit 1 ;;
 esac
 CTLEOF
-    
+
     chmod +x /usr/local/bin/ghost-transit-ctl
     success "管理工具已安装: ghost-transit-ctl"
 }
@@ -1416,7 +1416,7 @@ CTLEOF
 
 setup_health_check() {
     info "安装落地机健康检查脚本..."
-    
+
     cat > "${CONFIG_DIR}/health_check.sh" <<'HEALTHEOF'
 #!/usr/bin/env bash
 set -u
@@ -1566,7 +1566,7 @@ for ((i=0; i<landings_count; i++)); do
     if [[ "${DISABLE_ON_ICMP_FAIL:-0}" != "1" && "${enabled}" == "true" ]]; then
         continue
     fi
-    
+
     is_alive=false
 
     if timeout 5 ping -c 2 -W 3 -i 1 "${ip}" >/dev/null 2>&1; then
@@ -1577,28 +1577,28 @@ for ((i=0; i<landings_count; i++)); do
         log "WARN: 落地机 ${name} (${ip}) ICMP 不通，但未启用自动摘除，保持 enabled=${enabled}"
         continue
     fi
-    
+
     # v6.41：默认不因 ICMP 失败摘除；DISABLE_ON_ICMP_FAIL=1 时连续5次失败才禁用。
     # 读取失败计数
     fail_count=$(jq -r ".landings[$i].fail_count // 0" "${CONFIG_FILE}" 2>/dev/null) || fail_count=0
     [[ "${fail_count}" =~ ^[0-9]+$ ]] || fail_count=0
-    
+
     if [[ "${is_alive}" == "true" ]]; then
         # 存活 -> 重置失败计数
         if [[ ${fail_count} -gt 0 ]]; then
             update_config ".landings[$i].fail_count = 0" || continue
         fi
-        
+
         # 连续3次成功才重新启用（防止网络抖动频繁切换）
         if [[ "${enabled}" == "false" ]]; then
             success_count=$(jq -r ".landings[$i].success_count // 0" "${CONFIG_FILE}" 2>/dev/null) || success_count=0
             [[ "${success_count}" =~ ^[0-9]+$ ]] || success_count=0
             success_count=$((success_count + 1))
             update_config ".landings[$i].success_count = ${success_count}" || continue
-            
+
             if [[ ${success_count} -ge 3 ]]; then
                 update_config ".landings[$i].enabled = true | .landings[$i].success_count = 0" || continue
-                
+
                 # 重新生成并加载 nftables 规则
                 if ! reload_rules; then
                     log "ERROR: 规则重新生成失败，落地机 ${name} (${ip}) 恢复状态未生效"
@@ -1612,11 +1612,11 @@ for ((i=0; i<landings_count; i++)); do
         # 宕机 -> 增加失败计数
         fail_count=$((fail_count + 1))
         update_config ".landings[$i].fail_count = ${fail_count}" || continue
-        
+
         # 连续5次失败才禁用（防止高延迟线路偶发丢包误判）
         if [[ "${enabled}" == "true" ]] && [[ ${fail_count} -ge 5 ]]; then
             update_config ".landings[$i].enabled = false" || continue
-            
+
             # 重新生成并加载 nftables 规则
             if ! reload_rules; then
                 log "ERROR: 规则重新生成失败，落地机 ${name} (${ip}) 禁用状态未生效"
@@ -1632,9 +1632,9 @@ done
 health_sleep
 done
 HEALTHEOF
-    
+
     chmod +x "${CONFIG_DIR}/health_check.sh"
-    
+
     crontab -l 2>/dev/null | grep -v "health_check.sh" | crontab - 2>/dev/null || true
 
     if [[ ! -f /etc/default/ghost-transit-health ]]; then
@@ -1691,7 +1691,7 @@ uninstall() {
     echo "  [2] 仅停止服务（保留防火墙和配置）"
     echo ""
     read -p "请选择 (1/2): " choice
-    
+
     # 停止健康检查 cron 任务
     crontab -l 2>/dev/null | grep -v "health_check.sh" | crontab - 2>/dev/null || true
     systemctl stop ghost-transit-health.service 2>/dev/null || true
@@ -1699,16 +1699,16 @@ uninstall() {
     rm -f /etc/systemd/system/ghost-transit-health.service
     systemctl daemon-reload 2>/dev/null || true
     echo -e "${GREEN}健康检查任务已停止${NC}"
-    
+
     if [[ "${choice}" == "1" ]]; then
         # 完全卸载
         echo -e "${YELLOW}正在清理 nftables 规则...${NC}"
-        
+
         # 不停止/禁用 nftables 服务，避免触发发行版 ExecStop 清空第三方规则。
         # 仅删除本脚本维护的 Ghost-Proxy 表，避免清空第三方 nftables 规则。
         nft delete table inet ghost_proxy_filter 2>/dev/null || true
         nft delete table inet ghost_proxy_nat 2>/dev/null || true
-        
+
         rm -f /etc/nftables.d/ghost-proxy.nft
 
         # 只有确认是 Ghost-Proxy 专属 loader 时才删除主配置；混有用户规则则仅移除 include。
@@ -1721,26 +1721,26 @@ uninstall() {
             sed -i '\#^include "/etc/nftables.d/ghost-proxy.nft"$#d; /Ghost-Proxy nftables include/d' /etc/nftables.conf 2>/dev/null || true
             warn "/etc/nftables.conf 含非 Ghost-Proxy 内容，已保留并移除 Ghost include"
         fi
-        
+
         echo -e "${GREEN}nftables 规则已清理${NC}"
-        
+
         # 删除配置文件
         rm -rf "${CONFIG_DIR}"
         echo -e "${GREEN}配置文件已删除${NC}"
-        
+
         # 删除管理工具
         rm -f /usr/local/bin/ghost-transit-ctl
         echo -e "${GREEN}管理工具已删除${NC}"
-        
+
         # 删除健康检查脚本
         rm -f /usr/local/bin/ghost-transit-health-check.sh
         rm -f /etc/default/ghost-transit-health
         echo -e "${GREEN}健康检查脚本已删除${NC}"
-        
+
         # 删除日志轮转配置
         rm -f /etc/logrotate.d/ghost-transit
         echo -e "${GREEN}日志轮转配置已删除${NC}"
-        
+
         # 恢复系统参数
         rm -f /etc/sysctl.d/99-transit-ghost.conf
         sysctl -p 2>/dev/null || true
@@ -1751,7 +1751,7 @@ uninstall() {
         echo -e "${CYAN}配置文件保留在 ${CONFIG_DIR}${NC}"
         echo -e "${CYAN}系统参数保留${NC}"
     fi
-    
+
     echo ""
     echo -e "${GREEN}卸载完成${NC}"
     exit 0
@@ -1763,7 +1763,7 @@ uninstall() {
 
 print_summary() {
     progress 6 6 "生成配置摘要"
-    
+
     local public_ip
     public_ip="${TRANSIT_PUBLIC_IP:-${PUBLIC_IP:-}}"
     if [[ -z "${public_ip}" ]]; then
@@ -1773,7 +1773,7 @@ print_summary() {
         public_ip="<请手动填写中转机公网IP>"
         warn "无法自动获取中转机公网 IP；可设置 TRANSIT_PUBLIC_IP 或 PUBLIC_IP 后重跑，或手动替换摘要中的占位符"
     fi
-    
+
     [[ -t 1 ]] && clear
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}  中转机安装完成! (v${VERSION})${NC}"
@@ -1843,14 +1843,14 @@ main() {
 
     check_os
     check_no_proxy  # P1-2: 检查应用层代理配置
-    
+
     # v6.12 新增: 安装依赖包
     install_dependencies
-    
+
     # v6.9 增强: 添加预检查
     check_disk_space
     check_network || warn "网络检查失败，但继续安装"
-    
+
     [[ -t 1 ]] && clear
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}  中转机安装脚本 v${VERSION}${NC}"
@@ -1864,9 +1864,9 @@ main() {
     echo "  - 支持多落地机配置"
     echo "  - 动态端口管理"
     echo ""
-    
+
     init_config
-    
+
     # v6.31: 支持多落地机非交互导入
     local existing_landings_count=0
     existing_landings_count=$(jq '.landings | length' "${CONFIG_FILE}" 2>/dev/null || echo 0)
@@ -1899,7 +1899,7 @@ main() {
         success "LANDING_LIST 配置完成"
     elif [[ -n "${LANDING_IP:-}" ]]; then
         info "检测到非交互模式，使用环境变量配置"
-        
+
         # 添加落地机
         local landing_name="${LANDING_NAME:-landing-1}"
         # 添加落地机和该落地机自己的端口映射
@@ -1907,9 +1907,9 @@ main() {
         local ss_port="${SS_PORT:-8389}"
         local awg_target="${AWG_TARGET_PORT:-51820}"
         local ss_target="${SS_TARGET_PORT:-8389}"
-        
+
         add_landing "${LANDING_IP}" "${landing_name}" "${LANDING_SSH_PORT:-22}" "${awg_port}" "${awg_target}" "${ss_port}" "${ss_target}"
-        
+
         success "非交互模式配置完成"
     elif [[ "${existing_landings_count}" =~ ^[0-9]+$ && "${existing_landings_count}" -gt 0 ]]; then
         info "保留已有 ${existing_landings_count} 个落地机，跳过交互新增"
@@ -1918,14 +1918,14 @@ main() {
         # 交互模式
         ask_landings
     fi
-    
+
     echo ""
     optimize_system
     setup_logrotate
     install_management_tool
     setup_nftables
     setup_health_check
-    
+
     # 可选：测试落地机连通性
     echo ""
     # v6.13 优化：支持环境变量跳过连通性测试（非交互模式）
@@ -1946,7 +1946,7 @@ main() {
     else
         info "非交互模式：跳过连通性测试；如需执行请设置 RUN_CONNECTIVITY_TEST=1"
     fi
-    
+
     print_summary
 }
 

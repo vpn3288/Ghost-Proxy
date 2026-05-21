@@ -1,5 +1,17 @@
 # Ghost-Proxy 审核记录
 
+# v6.90 版本 (2026-05-22)
+
+- ✅ 修复 P1：`verify_installation.sh landing` 支持 `SUBSTORE_URL`，会拉取 Sub-Store 输出、临时按 `type: file` 组合静态 `AWG-Tunnel` 基础配置，并检查主轨/备轨与 `dialer-proxy`。
+- ✅ 修复 P1：`clash-meta-substore-base.yaml` 占位符改为醒目的 `REPLACE-WITH-YOUR-SUBSTORE-OUTPUT-LINK`，并明确 Ghost-Proxy VPS 不提供 HTTP 订阅。
+- ✅ 修复 P1：`show-ghost-nodes` 和安装完成默认入口收敛为 Mihomo 直导、Sub-Store 指南两类；Provider/Base64/自洽 Provider 改到 `--advanced`，降低误粘概率。
+- ✅ 修复 P1/P2：Sub-Store 导入指南增加具体操作步骤和 `SUBSTORE_URL` 验证命令；`substore-copy.txt` 收敛为纯 provider-only YAML；备轨节点显式 `udp-over-tcp: true`。
+- ✅ 修复 P1：预编译 AWG 用户态资产新增 manifest/ref 校验支持；当前 v6.85 legacy 资产用 `PREBUILT_AWG_GO_REF`/`PREBUILT_AWG_TOOLS_REF` 防止旧 SHA 被误标为新 ref。
+- ✅ 增强稳定性：`awg-landing.service` 增加 `systemd-modules-load.service` 排序、`Restart=on-failure`、`StartLimitBurst=3`、`TimeoutStartSec=30`。
+- ✅ DD 基线提示补充：记录 Debian 点版本、`uname -r`、headers 与 DKMS 结果；headers 缺失时不建议强换内核，允许落地脚本回退 `amneziawg-go`。
+- ✅ 新增 `install_landing_v6.90.sh`、`install_transit_v6.90.sh`、`install_amneziawg_dkms_v6.90.sh`，并同步稳定入口。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.90.sh`、`install_transit_v6.90.sh`、`install_amneziawg_dkms_v6.90.sh`；`git diff --check` 通过。
+
 # v6.89 版本 (2026-05-22)
 
 - ✅ 修复 P1：DD 基线文案改为“Debian 12 Bookworm 当前点版本 / 12.14 为已验证排障基线”，明确当前 DD 命令只固定 Debian 12，不保证固定到 12.14；DD 后必须记录 `cat /etc/debian_version && uname -r`。

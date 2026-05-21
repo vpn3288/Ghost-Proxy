@@ -129,11 +129,11 @@ uninstall() {
     echo "  [2] 仅停止服务（保留防火墙和配置）"
     echo ""
     read -p "请选择 (1/2): " choice
-    
+
     # 停止并禁用所有服务
     systemctl stop awg-landing ss-main ss-backup landing-health-check ghost-landing-firewall 2>/dev/null || true
     systemctl disable awg-landing ss-main ss-backup landing-health-check ghost-landing-firewall 2>/dev/null || true
-    
+
     # 删除 systemd 服务文件
     rm -f /etc/systemd/system/awg-landing.service
     rm -f /etc/systemd/system/ss-main.service
@@ -145,7 +145,7 @@ uninstall() {
     rm -f /usr/local/bin/ghost-landing-firewall-apply.sh
     systemctl daemon-reload
     echo -e "${GREEN}服务已停止并禁用${NC}"
-    
+
     if [[ "${choice}" == "1" ]]; then
         # 完全卸载
         echo -e "${YELLOW}正在删除 Ghost-Proxy 专属防火墙规则...${NC}"
@@ -192,7 +192,7 @@ uninstall() {
         else
             warn "iptables 不存在，跳过落地机防火墙清理"
         fi
-        
+
         # 清理策略路由
         ip rule del table 100 2>/dev/null || true
         ip route flush table 100 2>/dev/null || true
@@ -203,7 +203,7 @@ uninstall() {
         rm -f /etc/systemd/system/home-ip-routing.service
         rm -f /usr/local/bin/home-ip-routing-apply.sh
         echo -e "${GREEN}策略路由已清理${NC}"
-        
+
         # 清理 cron 任务
         crontab -l 2>/dev/null | grep -v "rotate_obfuscation.sh" | crontab - 2>/dev/null || true
         echo -e "${GREEN}旧版计划任务已清理${NC}"
@@ -224,7 +224,7 @@ uninstall() {
         rm -f /etc/kernel/postinst.d/amneziawg-dkms
         systemctl daemon-reload 2>/dev/null || true
         echo -e "${GREEN}AmneziaWG DKMS 残留已清理${NC}"
-        
+
         if command -v shred >/dev/null 2>&1 && [[ -d "${CONFIG_DIR}" ]]; then
             find "${CONFIG_DIR}" -maxdepth 1 -type f \
                 \( -name 'clash-meta-config.yaml' -o -name 'clash-meta-subscription.txt' -o -name 'clash-meta-import-block.txt' -o -name 'mihomo-profile.yaml' -o -name 'substore-copy.txt' -o -name 'substore-import-guide.txt' -o -name 'clash-meta-substore-base.yaml' -o -name 'mihomo-static-awg-proxy.yaml' -o -name 'mihomo-static-awg-proxy.js' -o -name 'ghost-static-proxies.js' -o -name 'substore-awg-for-mihomo.yaml' -o -name 'substore-awg-for-mihomo-base64.txt' -o -name 'substore-awg-for-mihomo-jsonlines.txt' -o -name 'substore-provider-only.yaml' -o -name 'substore-mihomo-full.yaml' -o -name 'substore-mihomo-full-base64.txt' -o -name 'clash-meta-proxies.yaml' -o -name 'clash-meta-substore-nodes.txt' -o -name 'client-config.txt' -o -name 'ss-backup-uri.txt' -o -name 'ss-backup-uri-base64.txt' -o -name 'ss-main.json' -o -name 'ss-backup.json' -o -name 'metadata.json' -o -name '.awg_backend' \) \
@@ -232,7 +232,7 @@ uninstall() {
         fi
         rm -rf "${CONFIG_DIR}"
         echo -e "${GREEN}配置文件已删除${NC}"
-        
+
         rm -f /etc/sysctl.d/99-landing-ghost.conf
         rm -f /etc/sysctl.d/99-landing-ghost-prelim.conf
         rm -f /usr/local/bin/show-clash-config
@@ -247,7 +247,7 @@ uninstall() {
         echo -e "${CYAN}配置文件保留在 ${CONFIG_DIR}${NC}"
         echo -e "${CYAN}系统参数保留${NC}"
     fi
-    
+
     echo ""
     echo -e "${GREEN}卸载完成${NC}"
     exit 0
@@ -522,7 +522,7 @@ check_os() {
     if [[ ! -f /etc/debian_version ]]; then
         die "仅支持 Debian ${RECOMMENDED_OS_VERSION} 系统。推荐使用 DD 安装 Debian ${RECOMMENDED_OS_POINT} Bookworm minimal"
     fi
-    
+
     local version point_version
     version=$(cat /etc/debian_version | cut -d. -f1)
     point_version=$(cat /etc/debian_version)
@@ -545,7 +545,7 @@ check_os() {
 
 check_1panel_conflict() {
     local conflicts=()
-    
+
     for port in 80 443 8888; do
         if port_in_use tcp "${port}"; then
             local process
@@ -555,7 +555,7 @@ check_1panel_conflict() {
             fi
         fi
     done
-    
+
     if [[ ${#conflicts[@]} -gt 0 ]]; then
         info "检测到以下端口占用 (这是正常的,不会冲突):"
         for conflict in "${conflicts[@]}"; do
@@ -683,7 +683,7 @@ default_transit_port() {
 configure_ports() {
     info "配置端口..."
     load_existing_metadata_defaults
-    
+
     # v6.14: 支持非交互模式
     if [[ "${AUTO_INSTALL:-0}" == "1" ]]; then
         [[ -n "${LANDING_INDEX:-}" ]] || die "AUTO_INSTALL=1 需设置 LANDING_INDEX（从 1 开始）"
@@ -713,11 +713,11 @@ configure_ports() {
         success "端口配置完成: 落地AWG=${AWG_PORT}, 中转AWG=${TRANSIT_AWG_LISTEN_PORT}, 落地备轨=${SS_BACKUP_PORT}, 中转备轨=${TRANSIT_SS_LISTEN_PORT}"
         return 0
     fi
-    
+
     # AWG端口（从中转机配对信息获取，不需要用户输入）
     # SS_MAIN_PORT 固定为8388（监听在AWG隧道内部）
     # SS_BACKUP_PORT 需要用户配置或随机生成
-    
+
     echo ""
     echo -e "${YELLOW}配置备轨端口（直连中转机）:${NC}"
     echo "  [1] 使用默认端口 8389"
@@ -726,7 +726,7 @@ configure_ports() {
     echo ""
     read -p "请选择 (1/2/3, 默认1): " port_choice
     port_choice=${port_choice:-1}
-    
+
     case "${port_choice}" in
         1)
             SS_BACKUP_PORT=8389
@@ -753,7 +753,7 @@ configure_ports() {
             SS_BACKUP_PORT=8389
             ;;
     esac
-    
+
     # 检查端口是否被占用
     while port_in_use udp "${AWG_PORT}"; do
         warn "AWG UDP 端口 ${AWG_PORT} 已被占用"
@@ -781,7 +781,7 @@ configure_ports() {
         fi
         die "端口 ${SS_BACKUP_PORT} 已被占用，安装已停止；请重新运行并选择可用端口"
     done
-    
+
     TRANSIT_AWG_LISTEN_PORT=${TRANSIT_AWG_LISTEN_PORT:-$(default_transit_port "${AWG_PORT}")}
     TRANSIT_SS_LISTEN_PORT=${TRANSIT_SS_LISTEN_PORT:-$(default_transit_port "${SS_BACKUP_PORT}")}
 
@@ -802,7 +802,7 @@ validate_ip() {
     if [[ ! "${ip}" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         return 1
     fi
-    
+
     local IFS='.'
     local -a octets=(${ip})
     for octet in "${octets[@]}"; do
@@ -822,10 +822,10 @@ detect_home_ip_interface() {
         echo "${HOME_IFACE}"
         return 0
     fi
-    
+
     local interfaces=$(ip -o link show | awk -F': ' '{print $2}' | cut -d@ -f1 | grep -v '^lo$')
     local home_interface=""
-    
+
     for iface in ${interfaces}; do
         case "${iface}" in
             docker*|br-*|veth*|virbr*|podman*|cni*|flannel*|zt*|tailscale*|wg*|awg*)
@@ -835,7 +835,7 @@ detect_home_ip_interface() {
 
         local ip_addr default_route gateway
         ip_addr=$(ip -o -4 addr show dev "${iface}" scope global 2>/dev/null | awk '{split($4,a,"/"); print a[1]; exit}')
-        
+
         if [[ -n "${ip_addr}" ]]; then
             # 检测私有IP段（家宽IP）
             if [[ "${ip_addr}" =~ ^10\. ]] || [[ "${ip_addr}" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ "${ip_addr}" =~ ^192\.168\. ]] || [[ "${ip_addr}" =~ ^100\.(6[4-9]|7[0-9]|8[0-9]|9[0-9]|10[0-9]|11[0-9]|12[0-7])\. ]]; then
@@ -853,7 +853,7 @@ detect_home_ip_interface() {
             fi
         fi
     done
-    
+
     echo "未检测到家宽 IP，将使用默认出站接口" >&2
     return 1
 }
@@ -861,45 +861,45 @@ detect_home_ip_interface() {
 setup_home_ip_routing() {
     local home_iface="$1"
     local home_ip="$2"
-    
+
     if [[ -z "${home_iface}" ]] || [[ -z "${home_ip}" ]]; then
         return 1
     fi
-    
+
     info "配置家宽IP策略路由..."
-    
+
     # 获取网关
     local gateway=$(ip route show dev "${home_iface}" | grep default | awk '{print $3}' | head -1)
-    
+
     if [[ -z "${gateway}" ]]; then
         warn "无法获取家宽网卡 ${home_iface} 的网关，跳过策略路由"
         return 1
     fi
-    
+
     # 创建独立路由表（table 100）
     if ! grep -q "100 home_ip" /etc/iproute2/rt_tables 2>/dev/null; then
         echo "100 home_ip" >> /etc/iproute2/rt_tables
     fi
-    
+
     # 清理旧规则
     ip rule del from "${home_ip}" table 100 2>/dev/null || true
     ip route flush table 100 2>/dev/null || true
-    
+
     # 添加策略路由规则
     ip rule add from "${home_ip}" table 100 priority 100
     ip route add default via "${gateway}" dev "${home_iface}" table 100
-    
+
     # 立即验证策略路由是否生效
     if ! ip rule show | grep -q "from ${home_ip} lookup 100"; then
         error "✗ 策略路由规则验证失败"
         return 1
     fi
-    
+
     if ! ip route show table 100 | grep -q "default via ${gateway}"; then
         error "✗ 策略路由表验证失败"
         return 1
     fi
-    
+
     # 增强验证：测试流量是否真正走家宽网卡
     if command -v ip &>/dev/null; then
         local test_route=$(ip route get 8.8.8.8 from ${home_ip} 2>/dev/null || echo "")
@@ -908,10 +908,10 @@ setup_home_ip_routing() {
             log "WARN" "策略路由流量测试: ${test_route}"
         fi
     fi
-    
+
     success "家宽IP策略路由已配置: ${home_ip} -> ${home_iface} -> ${gateway}"
     log "INFO" "策略路由: table 100, from ${home_ip} via ${gateway} dev ${home_iface}"
-    
+
     # 持久化配置：ifupdown 和 systemd-networkd 均通过同一脚本重放策略路由。
     cat > /usr/local/bin/home-ip-routing-apply.sh <<EOF
 #!/bin/bash
@@ -975,7 +975,7 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload 2>/dev/null || true
     systemctl enable home-ip-routing.service >/dev/null 2>&1 || true
-    
+
     return 0
 }
 
@@ -992,32 +992,32 @@ ask_transit_info() {
 
     if [[ -n "${TRANSIT_IP:-}" ]] && [[ "${AUTO_INSTALL:-0}" == "1" ]]; then
         info "检测到非交互模式，使用环境变量配置"
-        
+
         # 验证IP格式
         if ! validate_ip "${TRANSIT_IP}"; then
             error "环境变量 TRANSIT_IP 格式错误: ${TRANSIT_IP}"
             exit 1
         fi
-        
+
         # 设置AWG端口（默认51820）
         AWG_PORT=${AWG_PORT:-51820}
         if ! [[ "${AWG_PORT}" =~ ^[0-9]+$ ]] || [[ "${AWG_PORT}" -lt 1 ]] || [[ "${AWG_PORT}" -gt 65535 ]]; then
             error "环境变量 AWG_PORT 必须是 1-65535 之间的数字"
             exit 1
         fi
-        
+
         success "非交互模式配置完成"
         info "  中转机 IP: ${TRANSIT_IP}"
         info "  落地 AWG 目标端口: ${AWG_PORT}"
         return 0
     fi
-    
+
     echo ""
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BOLD}  请输入中转机信息${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    
+
     # 输入中转机 IP
     while true; do
         local input_transit_ip=""
@@ -1033,7 +1033,7 @@ ask_transit_info() {
             warn "IP 格式错误，请重新输入"
         fi
     done
-    
+
     # 输入 AWG 端口
     while true; do
         local input_awg_port=""
@@ -1045,7 +1045,7 @@ ask_transit_info() {
             warn "端口必须是 1-65535 之间的数字"
         fi
     done
-    
+
     success "中转机信息已确认"
     info "  中转机 IP: ${TRANSIT_IP}"
     info "  落地 AWG 目标端口: ${AWG_PORT}"
@@ -1066,7 +1066,7 @@ validate_ss_password() {
 # 【新增】密码复用机制
 generate_password() {
     local password_file="${CONFIG_DIR}/.ss_password"
-    
+
     # [P0-2] 优先使用环境变量传入的密码（支持多落地机统一密码）
     if [[ -n "${SS_PASSWORD:-}" ]]; then
         validate_ss_password "${SS_PASSWORD}"
@@ -1077,7 +1077,7 @@ generate_password() {
         log "INFO" "密码已从环境变量设置"
         return 0
     fi
-    
+
     # 如果已有密码文件，复用
     if [[ -f "${password_file}" ]]; then
         SS_PASSWORD=$(cat "${password_file}")
@@ -1086,7 +1086,7 @@ generate_password() {
         log "INFO" "从 ${password_file} 读取已有密码"
         return 0
     fi
-    
+
     # 生成新密码，校验字符类型，避免极端熵源异常生成低质量密码
     local attempt char_types
     for attempt in 1 2 3 4 5; do
@@ -1112,7 +1112,7 @@ generate_password() {
         die "密码生成失败（5 次尝试）"
     fi
     validate_ss_password "${SS_PASSWORD}"
-    
+
     # 保存密码
     mkdir -p "${CONFIG_DIR}"
     echo "${SS_PASSWORD}" > "${password_file}"
@@ -1128,7 +1128,7 @@ generate_password() {
 install_dependencies() {
     progress 1 11 "更新系统软件包"
     retry_command 3 5 apt-get update -qq || die "apt-get update 失败（3次尝试）"
-    
+
     progress 2 11 "安装基础依赖"
     retry_command 3 5 env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
         curl wget git build-essential jq iproute2 \
@@ -1163,7 +1163,7 @@ install_dependencies() {
         done
         [[ "${downloaded_dkms}" -eq 1 ]] || warn "DKMS 脚本下载失败，将继续使用 amneziawg-go 回退"
     fi
-    
+
     success "依赖安装完成"
 }
 
@@ -1229,20 +1229,20 @@ lockdown_dns_ipv6() {
     progress 3 11 "禁用 IPv6（防泄漏）"
 
     disable_ifupdown_ipv6_stanzas
-    
+
     # 禁用 IPv6（sysctl层）
     cat > /etc/sysctl.d/99-landing-ghost-prelim.conf <<EOF
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
-    
+
     sysctl -p /etc/sysctl.d/99-landing-ghost-prelim.conf &>/dev/null
     log "INFO" "IPv6 已禁用（sysctl层）"
-    
+
     success "IPv6 已完全禁用（sysctl）"
     log "INFO" "IPv6 sysctl 禁用已应用"
-    
+
     # 阻断 IPv6 入站和转发，OUTPUT 保持 ACCEPT 以避免影响 Docker/1Panel 内部链路
     if command -v ip6tables &>/dev/null; then
         ip6tables -P INPUT ACCEPT 2>/dev/null || true
@@ -1256,7 +1256,7 @@ EOF
         if ! ip6tables -C INPUT -j GHOST_IPV6_INPUT 2>/dev/null; then
             ip6tables -I INPUT 1 -j GHOST_IPV6_INPUT 2>/dev/null || warn "ip6tables 插入 GHOST_IPV6_INPUT 链失败"
         fi
-        
+
         # 保存规则
         if command -v netfilter-persistent &>/dev/null; then
             netfilter-persistent save &>/dev/null || true
@@ -1266,7 +1266,7 @@ EOF
     else
         warn "ip6tables 未安装，跳过防火墙层 IPv6 阻断"
     fi
-    
+
     if [[ "${APPEND_PUBLIC_DNS:-${LOCK_DNS:-0}}" == "1" ]]; then
         if [[ "${LOCK_DNS:-0}" == "1" && -z "${APPEND_PUBLIC_DNS:-}" ]]; then
             warn "LOCK_DNS 已改为兼容别名；实际行为是追加公共 DNS，不锁定 /etc/resolv.conf"
@@ -1306,7 +1306,7 @@ EOF
 
 install_amneziawg() {
     progress 4 11 "安装 AmneziaWG（DKMS 内核模块优先）"
-    
+
     # 检测架构
     local arch=$(uname -m)
     case "${arch}" in
@@ -1314,14 +1314,14 @@ install_amneziawg() {
         aarch64|arm64) info "检测到 ARM64 架构（甲骨文云）" ;;
         *) warn "未知架构: ${arch}，尝试继续安装" ;;
     esac
-    
+
     # 调用统一安装入口
     install_awg_runtime
 
     install -d -m 700 "${CONFIG_DIR}"
     printf '%s\n' "${AWG_BACKEND:-none}" > "${CONFIG_DIR}/.awg_backend"
     chmod 600 "${CONFIG_DIR}/.awg_backend"
-    
+
     success "AmneziaWG 安装完成（后端: ${AWG_BACKEND}）"
 }
 
@@ -1330,7 +1330,7 @@ install_amneziawg_dkms_standalone() {
     local script="${AWG_DKMS_SCRIPT:-}"
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    
+
     if [[ -z "${script}" ]]; then
         for path in \
             "${script_dir}/install_amneziawg_dkms_v${VERSION}.sh" \
@@ -1357,14 +1357,14 @@ install_amneziawg_dkms_standalone() {
     fi
 
     chmod +x "${script}" 2>/dev/null || true
-    
+
     info "调用独立 DKMS 脚本安装 AmneziaWG 内核模块: ${script}"
     if ! AWG_DKMS_REF="${AWG_DKMS_REF:-}" AWG_TOOLS_REF="${AWG_TOOLS_REF:-}" \
         DKMS_VERSION="${DKMS_VERSION:-}" GCC_VERSION="${GCC_VERSION:-}" "${script}"; then
         warn "独立 DKMS 脚本执行失败"
         return 1
     fi
-    
+
     modprobe amneziawg 2>/dev/null
 }
 
@@ -1609,7 +1609,7 @@ ensure_go_for_amneziawg_go() {
 # 用户态回退方案（amneziawg-go）
 install_amneziawg_go() {
     info "安装 AmneziaWG 用户态版本（amneziawg-go）"
-    
+
     if command -v awg &>/dev/null && command -v awg-quick &>/dev/null && command -v amneziawg-go &>/dev/null && awg_go_ref_matches; then
         info "AmneziaWG 工具和用户态后端已安装"
         return 0
@@ -1639,12 +1639,12 @@ install_amneziawg_go() {
         warn "固定 amneziawg-tools 编译依赖不可用，回退仓库默认版本"
         retry_command 3 5 env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pkg-config libmnl-dev || { warn "amneziawg-tools 编译依赖安装失败"; return 1; }
     }
-    
+
     local tmp_dir start_dir
     start_dir="$(pwd -P 2>/dev/null || printf '/')"
     tmp_dir=$(mktemp -d) || { warn "创建临时目录失败"; return 1; }
     cd "${tmp_dir}" || { warn "进入临时目录失败"; rm -rf "${tmp_dir}"; return 1; }
-    
+
     # 克隆并安装 awg/awg-quick 工具，最多重试3次
     local clone_success=0 attempt
     for attempt in 1 2 3; do
@@ -1657,9 +1657,9 @@ install_amneziawg_go() {
         [ $attempt -lt 3 ] && sleep 2
     done
     [ $clone_success -eq 0 ] && { warn "克隆 amneziawg-tools 失败（3次尝试）"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
-    
+
     cd amneziawg-tools/src || { warn "进入源码目录失败"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
-    
+
     # 编译，最多重试3次
     local build_success=0
     for attempt in 1 2 3; do
@@ -1671,7 +1671,7 @@ install_amneziawg_go() {
         [ $attempt -lt 3 ] && sleep 2
     done
     [ $build_success -eq 0 ] && { warn "编译 AmneziaWG 失败（3次尝试）"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
-    
+
     make install &>/dev/null || { warn "安装 AmneziaWG 失败"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
 
     cd "${tmp_dir}" || { warn "进入临时目录失败"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
@@ -1690,7 +1690,7 @@ install_amneziawg_go() {
     cd amneziawg-go || { warn "进入 amneziawg-go 源码目录失败"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
     make &>/dev/null || { warn "编译 amneziawg-go 失败"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
     make install &>/dev/null || { warn "安装 amneziawg-go 失败"; cd / 2>/dev/null || true; rm -rf "${tmp_dir}"; return 1; }
-    
+
     if [[ -d "${start_dir}" ]] && ! cd "${start_dir}" 2>/dev/null; then
         warn "无法恢复原始目录 ${start_dir}，已切换到 /"
         cd / 2>/dev/null || true
@@ -1700,7 +1700,7 @@ install_amneziawg_go() {
     fi
     rm -rf "${tmp_dir}"
     write_awg_go_ref_state
-    
+
     success "AmneziaWG 用户态工具和后端安装完成"
     return 0
 }
@@ -1763,13 +1763,13 @@ install_awg_runtime() {
         success "使用已有 AmneziaWG 内核模块"
         return 0
     fi
-    
+
     if install_amneziawg_dkms_standalone; then
         AWG_BACKEND="kernel"
         success "使用独立 DKMS 脚本安装的 AmneziaWG 内核模块"
         return 0
     fi
-    
+
     # 回退到用户态版本
     warn "DKMS 编译失败，自动回退到 amneziawg-go 用户态版本"
     if install_amneziawg_go || use_existing_amneziawg_go_runtime; then
@@ -1777,7 +1777,7 @@ install_awg_runtime() {
         success "使用 amneziawg-go 用户态版本（支持混淆）"
         return 0
     fi
-    
+
     die "DKMS 和 amneziawg-go 均失败，拒绝回退到无混淆的标准 WireGuard"
 }
 
@@ -1878,7 +1878,7 @@ detect_tunnel_mtu() {
 
 install_shadowsocks() {
     progress 5 11 "安装 Shadowsocks-2022 (sing-box)"
-    
+
     if command -v sing-box &>/dev/null; then
         local sing_box_bin
         sing_box_bin=$(command -v sing-box)
@@ -1894,12 +1894,12 @@ install_shadowsocks() {
         warn "sing-box 版本不匹配（当前: ${installed_ver:-unknown}, 需要: ${SINGBOX_VERSION}），重新安装固定版本"
         rm -f /usr/local/bin/sing-box
     fi
-    
+
     # 修复：官方脚本可能超时，改用GitHub Release直接下载
     local ARCH
     ARCH=$(uname -m)
     local DOWNLOAD_URL="" SINGBOX_SHA256=""
-    
+
     case "${ARCH}" in
         x86_64)
             DOWNLOAD_URL="https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz"
@@ -1914,19 +1914,19 @@ install_shadowsocks() {
             ;;
     esac
     [[ -n "${SINGBOX_SHA256}" ]] || die "sing-box ${SINGBOX_VERSION} (${ARCH}) 缺少 SHA256 固定值，拒绝安装"
-    
+
     info "下载 sing-box ${SINGBOX_VERSION} (${ARCH})..."
     cd /tmp
     curl -fsSL --connect-timeout 10 --retry 3 "${DOWNLOAD_URL}" -o sing-box.tar.gz || die "下载 sing-box 失败"
     verify_sha256_required sing-box.tar.gz "${SINGBOX_SHA256}" || die "sing-box SHA256 校验失败"
     tar -xzf sing-box.tar.gz || die "解压 sing-box 失败"
-    
+
     local EXTRACT_DIR=$(tar -tzf sing-box.tar.gz | head -1 | cut -f1 -d"/")
     cp "${EXTRACT_DIR}/sing-box" /usr/local/bin/ || die "安装 sing-box 失败"
     chmod +x /usr/local/bin/sing-box
-    
+
     rm -rf sing-box.tar.gz "${EXTRACT_DIR}"
-    
+
     success "Shadowsocks-2022 安装完成"
 }
 
@@ -2025,7 +2025,7 @@ EOF
 
 generate_obfuscation_params() {
     local params_file="${CONFIG_DIR}/.awg_obfs_params"
-    
+
     if [[ -f "${params_file}" ]]; then
         source "${params_file}"
         if ! valid_obfuscation_params; then
@@ -2045,7 +2045,7 @@ generate_obfuscation_params() {
         write_obfuscation_params "${params_file}"
         info "生成新的混淆参数"
     fi
-    
+
     # 导出为全局变量，确保所有函数都能访问
     export JC JMIN JMAX S1 S2 H1 H2 H3 H4
     log "INFO" "混淆参数已加载: JC=${JC}, JMIN=${JMIN}, JMAX=${JMAX}"
@@ -2053,9 +2053,9 @@ generate_obfuscation_params() {
 
 configure_amneziawg() {
     progress 6 11 "配置 AmneziaWG Server"
-    
+
     mkdir -p "${CONFIG_DIR}"
-    
+
     # 幂等性保护: 备份已有配置
     if [[ -f "${CONFIG_DIR}/awg0.conf" ]]; then
         local backup_file="${CONFIG_DIR}/awg0.conf.bak.$(date +%s)"
@@ -2063,7 +2063,7 @@ configure_amneziawg() {
         cleanup_old_backups "${CONFIG_DIR}/awg0.conf"
         warn "检测到已有配置，已备份到: ${backup_file}"
     fi
-    
+
     # v6.10 新增：AWG密钥幂等性保护
     local keys_file="${CONFIG_DIR}/.awg_keys"
     if [[ -f "${keys_file}" ]]; then
@@ -2074,12 +2074,12 @@ configure_amneziawg() {
         AWG_SERVER_PRIVATE=$(awg genkey)
         AWG_SERVER_PUBLIC=$(echo "${AWG_SERVER_PRIVATE}" | awg pubkey)
         log "INFO" "生成 AmneziaWG Server 密钥对"
-        
+
         # v6.0: 同时生成客户端密钥对（用于用户本地设备 Clash Meta）
         AWG_CLIENT_PRIVATE=$(awg genkey)
         AWG_CLIENT_PUBLIC=$(echo "${AWG_CLIENT_PRIVATE}" | awg pubkey)
         log "INFO" "生成 AmneziaWG Client 密钥对（用户本地设备使用）"
-        
+
         echo "AWG_SERVER_PRIVATE=${AWG_SERVER_PRIVATE}" > "${keys_file}"
         echo "AWG_SERVER_PUBLIC=${AWG_SERVER_PUBLIC}" >> "${keys_file}"
         echo "AWG_CLIENT_PRIVATE=${AWG_CLIENT_PRIVATE}" >> "${keys_file}"
@@ -2109,9 +2109,9 @@ PublicKey = ${AWG_CLIENT_PUBLIC}
 AllowedIPs = 10.8.0.2/32
 EOF
     chmod 600 "${CONFIG_DIR}/awg0.conf"
-    
+
     success "AmneziaWG Server 配置完成"
-    
+
     # 保存元数据供其他脚本使用
     cat > "${CONFIG_DIR}/metadata.json" <<EOF
 {
@@ -2124,23 +2124,23 @@ EOF
 }
 EOF
     log "INFO" "元数据已保存到 ${CONFIG_DIR}/metadata.json"
-    
+
     info "落地机配置完成，中转机将通过nftables DNAT转发流量到此落地机"
 }
 
 configure_shadowsocks() {
     progress 7 11 "配置 Shadowsocks-2022"
-    
+
     generate_password
-    
+
     # v5.9: 主轨监听 10.8.0.1（AWG 网关），通过 systemd 依赖解决启动顺序
     info "SS 主轨将监听 10.8.0.1:${SS_MAIN_PORT}（仅 AWG 隧道内可访问）"
     log "INFO" "ss-main 监听 10.8.0.1:${SS_MAIN_PORT}"
-    
+
     # 检测家宽IP网卡并配置策略路由
     local home_iface
     home_iface=$(detect_home_ip_interface || true)
-    
+
     if [[ -n "${home_iface}" ]] && [[ -n "${HOME_IP}" ]]; then
         if ! setup_home_ip_routing "${home_iface}" "${HOME_IP}"; then
             warn "家宽策略路由验证失败，跳过 sing-box bind_interface，避免误绑 Docker/1Panel 网卡"
@@ -2149,7 +2149,7 @@ configure_shadowsocks() {
             HOME_IP=""
         fi
     fi
-    
+
     # 幂等性保护: 备份已有配置
     if [[ -f "${CONFIG_DIR}/ss-main.json" ]]; then
         local backup_file="${CONFIG_DIR}/ss-main.json.bak.$(date +%s)"
@@ -2157,14 +2157,14 @@ configure_shadowsocks() {
         cleanup_old_backups "${CONFIG_DIR}/ss-main.json"
         warn "检测到已有 ss-main 配置，已备份"
     fi
-    
+
     if [[ -f "${CONFIG_DIR}/ss-backup.json" ]]; then
         local backup_file="${CONFIG_DIR}/ss-backup.json.bak.$(date +%s)"
         cp "${CONFIG_DIR}/ss-backup.json" "${backup_file}"
         cleanup_old_backups "${CONFIG_DIR}/ss-backup.json"
         warn "检测到已有 ss-backup 配置，已备份"
     fi
-    
+
     write_singbox_ss_config() {
         local file="$1" tag="$2" listen="$3" port="$4" network="$5" bind_iface="$6"
         local tmp_file="${file}.tmp.$$"
@@ -2214,10 +2214,10 @@ configure_shadowsocks() {
 
     log "INFO" "生成 Shadowsocks 主轨配置"
     write_singbox_ss_config "${CONFIG_DIR}/ss-main.json" "ss-main" "10.8.0.1" "${SS_MAIN_PORT}" "" "${home_iface}"
-    
+
     log "INFO" "生成 Shadowsocks 备轨配置"
     write_singbox_ss_config "${CONFIG_DIR}/ss-backup.json" "ss-backup" "0.0.0.0" "${SS_BACKUP_PORT}" "tcp" "${home_iface}"
-    
+
     success "Shadowsocks-2022 配置完成"
     check_singbox_configs
 }
@@ -2307,7 +2307,7 @@ TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     cat > /etc/systemd/system/ss-main.service <<EOF
 [Unit]
 Description=Shadowsocks-2022 Main Track
@@ -2323,7 +2323,7 @@ RestartSec=5s
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     cat > /etc/systemd/system/ss-backup.service <<EOF
 [Unit]
 Description=Shadowsocks-2022 Backup Track
@@ -2338,14 +2338,14 @@ RestartSec=5s
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     systemctl daemon-reload || die "systemd daemon-reload 失败"
-    
-    
+
+
     systemctl enable awg-landing.service &>/dev/null || die "启用 AWG 服务失败"
     systemctl start awg-landing.service || die "启动 AWG 服务失败"
     log "INFO" "AmneziaWG 客户端服务已启动"
-    
+
     # 等待隧道建立并验证 IP
     info "等待 AmneziaWG 隧道建立..."
     local tunnel_ready=false
@@ -2372,15 +2372,15 @@ EOF
         sleep 5
         detect_tunnel_mtu
     fi
-    
+
     systemctl enable ss-main.service &>/dev/null || die "启用 SS 主轨服务失败"
     systemctl start ss-main.service || die "启动 SS 主轨服务失败"
     log "INFO" "Shadowsocks 主轨服务已启动"
-    
+
     systemctl enable ss-backup.service &>/dev/null || die "启用 SS 备轨服务失败"
     systemctl start ss-backup.service || die "启动 SS 备轨服务失败"
     log "INFO" "Shadowsocks 备轨服务已启动"
-    
+
     # 配置日志轮转
     info "配置日志轮转..."
     cat > /etc/logrotate.d/landing-ghost <<EOF
@@ -2395,7 +2395,7 @@ ${LOG_FILE} {
 }
 EOF
     log "INFO" "日志轮转配置完成"
-    
+
     cat > /usr/local/bin/landing-health-check.sh <<EOF
 #!/usr/bin/env bash
 set -u
@@ -2596,7 +2596,7 @@ EOF
 
 generate_clash_meta_yaml() {
     info "生成 Clash Meta YAML 配置..."
-    
+
     cat > "${CONFIG_DIR}/clash-meta-config.yaml" <<YAML
 # ==========================================
 # Clash Meta 配置 - 落地机双轨配置
@@ -2699,7 +2699,7 @@ rules:
   # 默认走自动切换（链式代理）
   - MATCH,自动切换
 YAML
-    
+
     chmod 600 "${CONFIG_DIR}/clash-meta-config.yaml"
     success "Clash Meta 配置已生成: ${CONFIG_DIR}/clash-meta-config.yaml"
 
@@ -3182,7 +3182,7 @@ EOF
 
 setup_firewall() {
     progress 8 11 "配置防火墙"
-    
+
     local ssh_port=""
     if [[ -f /etc/ssh/sshd_config ]]; then
         ssh_port=$(awk '$1 == "Port" && $2 ~ /^[0-9]+$/ {print $2; exit}' /etc/ssh/sshd_config 2>/dev/null || true)
@@ -3191,12 +3191,12 @@ setup_firewall() {
         ssh_port=$(ss -H -tlnp 2>/dev/null | awk '/sshd/ {print $4; exit}' | grep -oE '[0-9]+$' || true)
     fi
     ssh_port=${ssh_port:-22}
-    
+
     iptables -C INPUT -i lo -j ACCEPT 2>/dev/null || iptables -I INPUT -i lo -j ACCEPT
     iptables -C INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || iptables -I INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-    
+
     iptables -C INPUT -p tcp --dport ${ssh_port} -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport ${ssh_port} -j ACCEPT
-    
+
     while iptables -D INPUT -s "${TRANSIT_IP}" -p udp --dport "${AWG_PORT}" -m comment --comment ghost-proxy-landing -j ACCEPT 2>/dev/null; do :; done
     while iptables -D INPUT -s "${TRANSIT_IP}" -p icmp --icmp-type echo-request -m comment --comment ghost-proxy-landing -j ACCEPT 2>/dev/null; do :; done
     while iptables -D INPUT -s "${TRANSIT_IP}" -p tcp --dport "${SS_BACKUP_PORT}" -m comment --comment ghost-proxy-landing -j ACCEPT 2>/dev/null; do :; done
@@ -3227,7 +3227,7 @@ setup_firewall() {
     iptables -F GHOST_LANDING_INPUT 2>/dev/null || true
     iptables -X GHOST_LANDING_INPUT 2>/dev/null || true
     iptables -E "${tmp_chain}" GHOST_LANDING_INPUT
-    
+
     # ==========================================
     # 【安全红线】内网业务端口隔离
     # ==========================================
@@ -3235,36 +3235,36 @@ setup_firewall() {
     # 必须且只能绑定在 AWG 内网 IP (10.8.0.1) 或 Docker 内网
     # 绝不允许在公网防火墙上放行这些端口
     # 如需访问，请使用 SSH 隧道: ssh -L 8888:10.8.0.1:8888 root@落地机IP
-    
+
     # v5.9: Docker 共存规则（不添加末尾 DROP，与 1Panel/Docker 共存）
     iptables -C INPUT -i docker0 -j ACCEPT 2>/dev/null || iptables -A INPUT -i docker0 -j ACCEPT
     iptables -C INPUT -i br-+ -j ACCEPT 2>/dev/null || iptables -A INPUT -i br-+ -j ACCEPT
     iptables -C INPUT -i awg0 -j ACCEPT 2>/dev/null || iptables -A INPUT -i awg0 -j ACCEPT
     netfilter-persistent save &>/dev/null || die "保存防火墙规则失败"
     install_landing_firewall_apply_service
-    
+
     success "防火墙配置完成"
 }
 
 optimize_system() {
     progress 10 11 "优化系统参数"
-    
+
     # v6.27: 精简 sysctl 优化，只保留 BBR + fq（核心优化）
     cat > /etc/sysctl.d/99-landing-ghost.conf <<EOF
 # BBR 拥塞控制算法（核心优化）
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc = fq
 EOF
-    
+
     sysctl -p /etc/sysctl.d/99-landing-ghost.conf &>/dev/null
     log "INFO" "系统参数已应用（BBR + fq）"
-    
+
     success "系统优化完成"
 }
 
 print_client_config() {
     progress 11 11 "生成客户端配置"
-    
+
     local public_ip landing_label
     public_ip="${LANDING_PUBLIC_IP:-${PUBLIC_IP:-}}"
     if [[ -z "${public_ip}" ]]; then
@@ -3275,7 +3275,7 @@ print_client_config() {
         warn "无法自动获取落地机公网 IP；可设置 LANDING_PUBLIC_IP 或 PUBLIC_IP 后重跑，或手动替换中转机命令中的占位符"
     fi
     landing_label="${LANDING_NAME:-落地机-$(date +%Y%m%d)}"
-    
+
     [[ -t 1 ]] && clear
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}  落地机安装完成!${NC}"
@@ -3316,7 +3316,7 @@ print_client_config() {
     if [[ "${APPEND_PUBLIC_DNS:-${LOCK_DNS:-0}}" == "1" ]]; then
         echo "  - DNS 已追加公共解析服务器（未锁定 resolv.conf）"
     fi
-    
+
     if [[ -n "${HOME_IP}" ]]; then
         echo "  - 家宽IP策略路由已配置: ${HOME_IP}"
     fi
@@ -3334,7 +3334,7 @@ print_client_config() {
     systemctl status ss-main.service --no-pager | head -3
     systemctl status ss-backup.service --no-pager | head -3
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
+
     cat > "${CONFIG_DIR}/client-config.txt" <<EOF
 主轨配置:
 服务器: ${TRANSIT_IP}
@@ -3348,7 +3348,7 @@ print_client_config() {
 密码: ${SS_PASSWORD}
 加密: 2022-blake3-aes-256-gcm
 EOF
-    
+
     # v5.3: 生成中转机配置文件
     cat > "${CONFIG_DIR}/transit-peer-config.txt" <<EOF
 # 中转机端口转发配置（请在中转机执行）
@@ -3363,10 +3363,10 @@ EOF
 ghost-transit-ctl add-landing "${public_ip}" "${landing_label}" --awg-listen ${TRANSIT_AWG_LISTEN_PORT} --awg-target ${AWG_PORT} --ss-listen ${TRANSIT_SS_LISTEN_PORT} --ss-target ${SS_BACKUP_PORT}
 ghost-transit-ctl reload-rules
 EOF
-    
+
     info "配置已保存到: ${CONFIG_DIR}/client-config.txt"
     info "中转机配置已保存到: ${CONFIG_DIR}/transit-peer-config.txt"
-    
+
     # v6.16 新增：创建快捷命令方便用户重新查看配置
 cat > /usr/local/bin/show-clash-config <<'EOF'
 #!/usr/bin/env bash
@@ -3424,7 +3424,7 @@ echo
 EOF
     chmod +x /usr/local/bin/show-ghost-nodes
     success "已创建快捷命令: show-ghost-nodes"
-    
+
     echo ""
     echo "推荐导入方式（复制执行即可从头到尾显示）："
     echo ""
@@ -3448,7 +3448,7 @@ EOF
     echo "  - 如节点列表出现 AWG-Tunnel，请升级 Sub-Store/ClashMeta，或设置 exclude-filter: AWG-Tunnel"
     echo "  - 安装后验证: curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/verify_installation.sh | bash -s landing"
     echo ""
-    
+
     # v6.28: 中转机使用每落地机独立 listen_port
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}${BOLD}📋 中转机配置指引${NC}"
@@ -3478,7 +3478,7 @@ main() {
     echo -e "${CYAN}  架构: AmneziaWG → SS-2022 (高性能双轨)${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    
+
     check_root
     check_os
 
@@ -3493,13 +3493,13 @@ main() {
 
     check_1panel_conflict
     install_dependencies
-    
+
     ask_transit_info
     validate_auto_install_inputs
     stop_own_services_for_reinstall
     configure_ports
     generate_obfuscation_params
-    
+
     echo ""
     lockdown_dns_ipv6
     install_amneziawg

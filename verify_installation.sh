@@ -70,7 +70,9 @@ validate_substore_provider_combo() {
     local static_awg="/etc/landing-ghost/mihomo-static-awg-proxy.yaml"
     local provider="/etc/landing-ghost/substore-provider-only.yaml"
     local base="/etc/landing-ghost/clash-meta-substore-base.yaml"
-    local tmp_config combo_ok=1
+    local tmp_config tmp_provider="" provider_for_config provider_label combo_ok=1
+    provider_for_config="${provider}"
+    provider_label="本地 provider-only"
 
     for file in "${static_awg}" "${provider}" "${base}"; do
         if [[ ! -s "${file}" ]]; then
@@ -79,12 +81,40 @@ validate_substore_provider_combo() {
         fi
     done
 
-    for yaml_key in proxy-providers ghost "https://example.invalid/replace-with-substore-output.yaml" "exclude-filter: '^AWG-Tunnel$'" "filter: '^(主轨-UDP极速|备轨-TCP稳定)$'"; do
+    if [[ -n "${SUBSTORE_URL:-}" ]]; then
+        if ! command -v curl >/dev/null 2>&1; then
+            fail "设置了 SUBSTORE_URL 但缺少 curl，无法拉取 Sub-Store 输出"
+            return 1
+        fi
+        tmp_provider=$(mktemp)
+        if curl -fsSL --connect-timeout 10 --retry 2 "${SUBSTORE_URL}" -o "${tmp_provider}"; then
+            provider_for_config="${tmp_provider}"
+            provider_label="Sub-Store URL 输出"
+            ok "已拉取 SUBSTORE_URL 输出用于端到端校验"
+        else
+            rm -f "${tmp_provider}"
+            fail "Sub-Store URL 拉取失败: ${SUBSTORE_URL}"
+            return 1
+        fi
+    fi
+
+    for yaml_key in proxy-providers ghost "https://example.invalid/REPLACE-WITH-YOUR-SUBSTORE-OUTPUT-LINK.yaml" "exclude-filter: '^AWG-Tunnel$'" "filter: '^(主轨-UDP极速|备轨-TCP稳定)$'"; do
         if ! grep -Fq "${yaml_key}" "${base}"; then
             fail "ClashMeta Sub-Store 基础模板缺少: ${yaml_key}"
             combo_ok=0
         fi
     done
+
+    for yaml_key in 主轨-UDP极速 备轨-TCP稳定 'dialer-proxy: "AWG-Tunnel"' 'udp-over-tcp: true'; do
+        if ! grep -Fq "${yaml_key}" "${provider_for_config}"; then
+            fail "${provider_label} 缺少: ${yaml_key}"
+            combo_ok=0
+        fi
+    done
+    if grep -Eq 'name:[[:space:]]*"?AWG-Tunnel"?' "${provider_for_config}"; then
+        fail "${provider_label} 不应包含 AWG-Tunnel 节点"
+        combo_ok=0
+    fi
 
     tmp_config=$(mktemp)
     cat > "${tmp_config}" <<'YAML'
@@ -103,7 +133,7 @@ YAML
 proxy-providers:
   ghost:
     type: file
-    path: ${provider}
+    path: ${provider_for_config}
     health-check:
       enable: true
       url: https://cp.cloudflare.com/generate_204
@@ -141,18 +171,18 @@ YAML
 
     if command -v mihomo >/dev/null 2>&1; then
         if mihomo -t -f "${tmp_config}" >/dev/null 2>&1; then
-            ok "mihomo 可解析静态 AWG + provider-only 组合配置"
+            ok "mihomo 可解析静态 AWG + ${provider_label} 组合配置"
         else
-            fail "mihomo 无法解析静态 AWG + provider-only 组合配置"
+            fail "mihomo 无法解析静态 AWG + ${provider_label} 组合配置"
             combo_ok=0
         fi
     else
-        warn "未安装 mihomo，跳过静态 AWG + provider-only 真实解析测试"
+        warn "未安装 mihomo，跳过静态 AWG + ${provider_label} 真实解析测试"
     fi
 
-    rm -f "${tmp_config}"
+    rm -f "${tmp_config}" "${tmp_provider}"
     if [[ "${combo_ok}" -eq 1 ]]; then
-        ok "Sub-Store provider-only 组合配置完整"
+        ok "Sub-Store ${provider_label} 组合配置完整"
         return 0
     fi
     return 1
@@ -276,13 +306,13 @@ verify_landing() {
 
     if [[ -s /etc/landing-ghost/substore-provider-only.yaml ]]; then
         local provider_only_ok=1
-        for yaml_key in 主轨-UDP极速 备轨-TCP稳定 'dialer-proxy: "AWG-Tunnel"'; do
+        for yaml_key in 主轨-UDP极速 备轨-TCP稳定 'dialer-proxy: "AWG-Tunnel"' 'udp-over-tcp: true'; do
             if ! grep -Fq "${yaml_key}" /etc/landing-ghost/substore-provider-only.yaml; then
                 fail "Sub-Store provider-only YAML 缺少: ${yaml_key}"
                 provider_only_ok=0
             fi
         done
-        if grep -Fq 'name: "AWG-Tunnel"' /etc/landing-ghost/substore-provider-only.yaml; then
+        if grep -Eq 'name:[[:space:]]*"?AWG-Tunnel"?' /etc/landing-ghost/substore-provider-only.yaml; then
             fail "Sub-Store provider-only YAML 不应包含 AWG-Tunnel 节点"
             provider_only_ok=0
         fi
@@ -353,7 +383,7 @@ verify_landing() {
         && grep -Fq "备轨-TCP稳定" /etc/landing-ghost/substore-copy.txt \
         && grep -Fq 'dialer-proxy: "AWG-Tunnel"' /etc/landing-ghost/substore-copy.txt \
         && ! grep -Fq 'SUBSTORE_MIHOMO_FULL_START' /etc/landing-ghost/substore-copy.txt \
-        && ! grep -Fq 'name: "AWG-Tunnel"' /etc/landing-ghost/substore-copy.txt; then
+        && ! grep -Eq 'name:[[:space:]]*"?AWG-Tunnel"?' /etc/landing-ghost/substore-copy.txt; then
         ok "Sub-Store 复制文件为单一 provider-only YAML"
     else
         fail "Sub-Store 复制文件缺失或仍混入完整 Profile/AWG-Tunnel"
@@ -546,6 +576,7 @@ case "${1:-}" in
         ;;
     *)
         echo "用法: bash verify_installation.sh [landing|transit]"
+        echo "Sub-Store 端到端验证: SUBSTORE_URL='https://...' bash verify_installation.sh landing"
         exit 1
         ;;
 esac

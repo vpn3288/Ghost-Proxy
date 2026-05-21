@@ -83,8 +83,30 @@ jobs:
       - name: Calculate SHA256
         run: |
           set -euo pipefail
+          . ./versions.conf
           cd dist
-          sha256sum "amneziawg-go-linux-${{ matrix.arch }}" "amneziawg-tools-linux-${{ matrix.arch }}.tar.gz" > "checksums-${{ matrix.arch }}.txt"
+          go_sha="$(sha256sum "amneziawg-go-linux-${{ matrix.arch }}" | awk "{print \$1}")"
+          tools_sha="$(sha256sum "amneziawg-tools-linux-${{ matrix.arch }}.tar.gz" | awk "{print \$1}")"
+          {
+            printf "%s  %s\n" "${go_sha}" "amneziawg-go-linux-${{ matrix.arch }}"
+            printf "%s  %s\n" "${tools_sha}" "amneziawg-tools-linux-${{ matrix.arch }}.tar.gz"
+          } > "checksums-${{ matrix.arch }}.txt"
+          cat > "manifest-linux-${{ matrix.arch }}.json" <<EOF
+          {
+            "schema": "ghost-proxy-awg-prebuilt.v1",
+            "os": "linux",
+            "arch": "${{ matrix.arch }}",
+            "awg_go_ref": "${AWG_GO_REF}",
+            "awg_tools_ref": "${AWG_TOOLS_REF}",
+            "go_toolchain_version": "${GO_TOOLCHAIN_VERSION}",
+            "pkg_config_version": "${PKG_CONFIG_VERSION}",
+            "libmnl_dev_version": "${LIBMNL_DEV_VERSION}",
+            "amneziawg_go_asset": "amneziawg-go-linux-${{ matrix.arch }}",
+            "amneziawg_go_sha256": "${go_sha}",
+            "amneziawg_tools_asset": "amneziawg-tools-linux-${{ matrix.arch }}.tar.gz",
+            "amneziawg_tools_sha256": "${tools_sha}"
+          }
+          EOF
 
       - uses: actions/upload-artifact@v4
         with:
@@ -93,6 +115,7 @@ jobs:
             dist/amneziawg-go-linux-${{ matrix.arch }}
             dist/amneziawg-tools-linux-${{ matrix.arch }}.tar.gz
             dist/checksums-${{ matrix.arch }}.txt
+            dist/manifest-linux-${{ matrix.arch }}.json
 
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/')
@@ -102,3 +125,4 @@ jobs:
             dist/amneziawg-go-linux-${{ matrix.arch }}
             dist/amneziawg-tools-linux-${{ matrix.arch }}.tar.gz
             dist/checksums-${{ matrix.arch }}.txt
+            dist/manifest-linux-${{ matrix.arch }}.json
