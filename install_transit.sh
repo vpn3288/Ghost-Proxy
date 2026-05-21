@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_transit_v6.76.sh — 中转机安装脚本
-# 版本: v6.76 (2026-05-21)
-# v6.76 - 同步落地机 v6.76 彩色命令说明版本。
+# install_transit_v6.77.sh — 中转机安装脚本
+# 版本: v6.77 (2026-05-21)
+# v6.77 - 同步落地机 v6.77 颜色变量修复版本。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 版本号
-VERSION="6.76"
+VERSION="6.77"
 SCRIPT_NAME="install_transit_v${VERSION}.sh"
 CONFIG_DIR="/etc/ghost-transit"
 CONFIG_FILE="${CONFIG_DIR}/config.json"

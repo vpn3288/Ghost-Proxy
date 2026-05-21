@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.76.sh — 落地机安装脚本
-# 版本: v6.76 (2026-05-21)
-# v6.76 - 三条完整文件查看命令增加用途说明与颜色提示。
+# install_landing_v6.77.sh — 落地机安装脚本
+# 版本: v6.77 (2026-05-21)
+# v6.77 - 修复 BLUE 未定义导致安装完成输出中断，并同步已安装菜单的三条命令用途说明。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.76"
+VERSION="6.77"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
@@ -56,6 +56,7 @@ PREBUILT_AWG_TOOLS_URL_arm64="${PREBUILT_AWG_TOOLS_URL_arm64:-}"
 PREBUILT_AWG_TOOLS_SHA256_arm64="${PREBUILT_AWG_TOOLS_SHA256_arm64:-}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
@@ -284,8 +285,13 @@ show_generated_nodes() {
 
     echo -e "${GREEN}复制下面三条命令，可从头到尾完整显示对应文件:${NC}"
     echo ""
+    echo -e "${RED}直接导入 Clash Meta / Mihomo 的完整双轨配置：${NC}"
     echo "cat ${CONFIG_DIR}/mihomo-profile.yaml"
+    echo ""
+    echo -e "${BLUE}复制到 Sub-Store 的 provider 节点文件（主轨/备轨）：${NC}"
     echo "cat ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
+    echo ""
+    echo -e "${GREEN}复制到浏览器分流 JS 的 GHOST_STATIC_PROXIES 常量：${NC}"
     echo "cat ${CONFIG_DIR}/ghost-static-proxies.js"
 }
 

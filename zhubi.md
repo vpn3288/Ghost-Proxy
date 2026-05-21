@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.77 版本 (2026-05-21)
+
+- ✅ 修复安装完成输出 `${BLUE}` 未定义导致 `set -u` 中断的问题。
+- ✅ 已安装菜单“显示已生成节点”同步红/蓝/绿三条命令用途说明。
+- ✅ ARM 落地机 `132.145.191.90` 实机重建节点确认：安装完成输出不再中断，`show-ghost-nodes` 显示红/蓝/绿三条命令，验证 0 警告。
+- ✅ 新增 `install_landing_v6.77.sh`、`install_transit_v6.77.sh`、`install_amneziawg_dkms_v6.77.sh`，并清理 v6.76 快照。
+
 # v6.76 版本 (2026-05-21)
 
 - ✅ 三条完整文件查看命令增加用途说明：Mihomo 完整双轨配置、Sub-Store provider、浏览器分流 JS 常量。
