@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.70.sh — 落地机安装脚本
-# 版本: v6.70 (2026-05-21)
-# v6.70 - 生成带分割标志的 Sub-Store 复制文件。
+# install_landing_v6.71.sh — 落地机安装脚本
+# 版本: v6.71 (2026-05-21)
+# v6.71 - 修复多落地机重跑时中转端口回落默认值导致节点不通。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.70"
+VERSION="6.71"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
@@ -222,6 +222,27 @@ landing_installed() {
     return 0
 }
 
+load_existing_metadata_defaults() {
+    [[ -f "${CONFIG_DIR}/metadata.json" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local value
+    value=$(jq -r '.transit_ip // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+    [[ -n "${value}" && -z "${TRANSIT_IP:-}" ]] && TRANSIT_IP="${value}"
+
+    value=$(jq -r '.awg_port // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+    [[ "${value}" =~ ^[0-9]+$ && "${AWG_PORT:-51820}" == "51820" ]] && AWG_PORT="${value}"
+
+    value=$(jq -r '.ss_backup_port // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+    [[ "${value}" =~ ^[0-9]+$ && "${SS_BACKUP_PORT:-8389}" == "8389" ]] && SS_BACKUP_PORT="${value}"
+
+    value=$(jq -r '.transit_awg_listen_port // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+    [[ "${value}" =~ ^[0-9]+$ && -z "${TRANSIT_AWG_LISTEN_PORT:-}" ]] && TRANSIT_AWG_LISTEN_PORT="${value}"
+
+    value=$(jq -r '.transit_ss_listen_port // ""' "${CONFIG_DIR}/metadata.json" 2>/dev/null || true)
+    [[ "${value}" =~ ^[0-9]+$ && -z "${TRANSIT_SS_LISTEN_PORT:-}" ]] && TRANSIT_SS_LISTEN_PORT="${value}"
+}
+
 show_generated_nodes() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}  已生成节点 / 配置文件${NC}"
@@ -283,6 +304,29 @@ show_generated_nodes() {
     echo -e "${GREEN}完整可运行 Mihomo 配置文件:${NC} ${CONFIG_DIR}/clash-meta-config.yaml"
 }
 
+generated_nodes_exist() {
+    [[ -s "${CONFIG_DIR}/mihomo-profile.yaml" ]] \
+        || [[ -s "${CONFIG_DIR}/substore-copy.txt" ]] \
+        || [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" ]] \
+        || [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" ]] \
+        || [[ -s "${CONFIG_DIR}/clash-meta-config.yaml" ]]
+}
+
+confirm_overwrite_nodes() {
+    [[ "${AUTO_INSTALL:-0}" == "1" ]] && return 0
+    [[ -t 0 ]] || return 0
+    generated_nodes_exist || return 0
+
+    echo ""
+    echo -e "${YELLOW}检测到本机已经生成过客户端节点。${NC}"
+    echo "继续会覆盖旧的 Sub-Store YAML/JSON、Mihomo Profile 和 SS URI。"
+    echo "如果只是中转端口填错，建议在菜单选择“修正中转端口并重新生成节点（不重装服务）”。"
+    read -p "确认覆盖旧节点并继续? (y/N): " confirm
+    if [[ "${confirm}" != "y" && "${confirm}" != "Y" ]]; then
+        die "已取消覆盖旧节点"
+    fi
+}
+
 delete_generated_nodes() {
     echo -e "${YELLOW}将删除本机生成的客户端节点文件，不停止服务、不清理防火墙。${NC}"
     read -p "确认删除节点文件? (y/N): " confirm
@@ -307,6 +351,52 @@ delete_generated_nodes() {
     exit 0
 }
 
+regenerate_nodes_only() {
+    if [[ ! -f "${CONFIG_DIR}/.awg_keys" || ! -f "${CONFIG_DIR}/.ss_password" || ! -f "${CONFIG_DIR}/.awg_obfs_params" ]]; then
+        die "缺少密钥/密码/混淆参数，不能只重建节点；请选择完整添加/更新节点"
+    fi
+
+    load_existing_metadata_defaults
+    # shellcheck disable=SC1090
+    source "${CONFIG_DIR}/.awg_keys"
+    SS_PASSWORD=$(cat "${CONFIG_DIR}/.ss_password")
+    validate_ss_password "${SS_PASSWORD}"
+    # shellcheck disable=SC1090
+    source "${CONFIG_DIR}/.awg_obfs_params"
+    valid_obfuscation_params || die "已有 AWG 混淆参数无效，不能只重建节点"
+    confirm_overwrite_nodes
+
+    if [[ -z "${TRANSIT_IP:-}" ]]; then
+        while true; do
+            read -p "中转机 IP: " TRANSIT_IP
+            validate_ip "${TRANSIT_IP}" && break
+            warn "IP 地址格式错误，请重新输入"
+        done
+    fi
+
+    echo ""
+    echo -e "${YELLOW}请填写中转机实际端口。多落地机时必须与中转机 ghost-transit-ctl 显示一致。${NC}"
+    TRANSIT_AWG_LISTEN_PORT=$(read_port_loop "中转机 AWG 监听端口" "${TRANSIT_AWG_LISTEN_PORT:-$(default_transit_port "${AWG_PORT}")}")
+    TRANSIT_SS_LISTEN_PORT=$(read_port_loop "中转机 SS 备轨监听端口" "${TRANSIT_SS_LISTEN_PORT:-$(default_transit_port "${SS_BACKUP_PORT}")}")
+
+    mkdir -p "${CONFIG_DIR}"
+    cat > "${CONFIG_DIR}/metadata.json" <<EOF
+{
+  "transit_ip": "${TRANSIT_IP}",
+  "awg_port": ${AWG_PORT},
+  "transit_awg_listen_port": ${TRANSIT_AWG_LISTEN_PORT},
+  "ss_main_port": ${SS_MAIN_PORT},
+  "ss_backup_port": ${SS_BACKUP_PORT},
+  "transit_ss_listen_port": ${TRANSIT_SS_LISTEN_PORT}
+}
+EOF
+    chmod 644 "${CONFIG_DIR}/metadata.json"
+
+    generate_clash_meta_yaml
+    print_client_config
+    exit 0
+}
+
 show_landing_menu() {
     while true; do
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -316,16 +406,18 @@ show_landing_menu() {
         echo "  [1] 添加/更新节点（重新生成落地机服务与客户端节点）"
         echo "  [2] 显示已生成 Sub-Store 节点"
         echo "  [3] 删除已生成节点文件（不卸载服务）"
-        echo "  [4] 卸载落地机"
-        echo "  [5] 退出"
+        echo "  [4] 修正中转端口并重新生成节点（不重装服务）"
+        echo "  [5] 卸载落地机"
+        echo "  [6] 退出"
         echo ""
-        read -p "请选择 (1/2/3/4/5): " choice
+        read -p "请选择 (1/2/3/4/5/6): " choice
         case "${choice}" in
             1) return 0 ;;
             2) show_generated_nodes; exit 0 ;;
             3) delete_generated_nodes ;;
-            4) uninstall ;;
-            5) exit 0 ;;
+            4) regenerate_nodes_only ;;
+            5) uninstall ;;
+            6) exit 0 ;;
             *) warn "无效选择，请重新输入" ;;
         esac
     done
@@ -531,6 +623,7 @@ default_transit_port() {
 
 configure_ports() {
     info "配置端口..."
+    load_existing_metadata_defaults
     
     # v6.14: 支持非交互模式
     if [[ "${AUTO_INSTALL:-0}" == "1" ]]; then
@@ -831,6 +924,8 @@ EOF
 # 用户输入
 # ==========================================
 ask_transit_info() {
+    load_existing_metadata_defaults
+
     # v6.14: 支持非交互模式
     if [[ "${AUTO_INSTALL:-0}" == "1" && -z "${TRANSIT_IP:-}" ]]; then
         die "AUTO_INSTALL=1 时必须设置 TRANSIT_IP"
@@ -866,7 +961,13 @@ ask_transit_info() {
     
     # 输入中转机 IP
     while true; do
-        read -p "中转机公网 IP: " TRANSIT_IP
+        local input_transit_ip=""
+        if [[ -n "${TRANSIT_IP:-}" ]]; then
+            read -p "中转机公网 IP (默认 ${TRANSIT_IP}): " input_transit_ip
+            TRANSIT_IP="${input_transit_ip:-${TRANSIT_IP}}"
+        else
+            read -p "中转机公网 IP: " TRANSIT_IP
+        fi
         if validate_ip "${TRANSIT_IP}"; then
             break
         else
@@ -876,8 +977,9 @@ ask_transit_info() {
     
     # 输入 AWG 端口
     while true; do
-        read -p "AmneziaWG 端口 (默认 51820): " AWG_PORT
-        AWG_PORT=${AWG_PORT:-51820}
+        local input_awg_port=""
+        read -p "落地机 AmneziaWG 目标端口 (默认 ${AWG_PORT:-51820}): " input_awg_port
+        AWG_PORT=${input_awg_port:-${AWG_PORT:-51820}}
         if [[ "${AWG_PORT}" =~ ^[0-9]+$ ]] && [[ "${AWG_PORT}" -ge 1 ]] && [[ "${AWG_PORT}" -le 65535 ]]; then
             break
         else
@@ -2817,6 +2919,11 @@ EOF
     echo "ghost-transit-ctl add-landing \"${public_ip}\" \"${landing_label}\" --awg-listen ${TRANSIT_AWG_LISTEN_PORT} --awg-target ${AWG_PORT} --ss-listen ${TRANSIT_SS_LISTEN_PORT} --ss-target ${SS_BACKUP_PORT}"
     echo "ghost-transit-ctl reload-rules"
     echo ""
+    echo "如果中转机提示端口或 IP 冲突："
+    echo "  - AWG 监听冲突：回到本脚本菜单选择“修正中转端口”，修改中转 AWG 监听端口"
+    echo "  - SS 监听冲突：回到本脚本菜单选择“修正中转端口”，修改中转 SS 监听端口"
+    echo "  - 落地机 IP 已存在：不要重复添加；先在中转机运行 ghost-transit-ctl status 确认当前映射"
+    echo ""
 }
 
 # ==========================================
@@ -2835,8 +2942,13 @@ main() {
     check_root
     check_os
 
+    if [[ "${1:-}" == "--regenerate-nodes" ]]; then
+        regenerate_nodes_only
+    fi
+
     if [[ "${AUTO_INSTALL:-0}" != "1" && $# -eq 0 && -t 0 ]] && landing_installed; then
         show_landing_menu
+        confirm_overwrite_nodes
     fi
 
     check_1panel_conflict

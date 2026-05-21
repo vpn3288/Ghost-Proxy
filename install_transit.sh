@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_transit_v6.70.sh — 中转机安装脚本
-# 版本: v6.70 (2026-05-21)
-# v6.70 - 同步落地机 Sub-Store 分割标志输出版本。
+# install_transit_v6.71.sh — 中转机安装脚本
+# 版本: v6.71 (2026-05-21)
+# v6.71 - 同步落地机多落地机端口修复，并严格拒绝导入命令冲突。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 版本号
-VERSION="6.70"
+VERSION="6.71"
 SCRIPT_NAME="install_transit_v${VERSION}.sh"
 CONFIG_DIR="/etc/ghost-transit"
 CONFIG_FILE="${CONFIG_DIR}/config.json"
@@ -375,15 +375,25 @@ add_landing() {
     check_port_conflict "${awg_listen}" "udp" "AWG中转监听 (LANDING_LIST)"
     check_port_conflict "${ss_listen}" "tcp" "SS中转监听 (LANDING_LIST)"
     
-    local action="添加"
     if jq -e --arg ip "$ip" '.landings[]? | select(.ip == $ip)' "${CONFIG_FILE}" &>/dev/null; then
-        action="更新"
-        warn "落地机 ${ip} 已存在，将更新名称和端口映射"
+        error "落地机 IP 已存在: ${ip}"
+        error "为防止覆盖旧映射，落地机导入命令已拒绝执行。"
+        error "请先运行 ghost-transit-ctl status 确认现有映射；如果是新落地机，请修改落地机 IP。"
+        return 1
     fi
-    if jq -e --arg ip "$ip" --argjson awg "$awg_listen" --argjson ss "$ss_listen" \
-       '[.landings[]? | select(.ip != $ip) | .ports[]? | select(.listen == $awg or .listen == $ss)] | length > 0' \
+
+    if jq -e --argjson awg "$awg_listen" \
+       '[.landings[]? | .ports[]? | select(.proto == "udp" and .listen == $awg)] | length > 0' \
        "${CONFIG_FILE}" &>/dev/null; then
-        error "监听端口 ${awg_listen} 或 ${ss_listen} 已被其他落地机使用"
+        error "AWG 中转监听端口冲突: ${awg_listen}/udp 已被其他落地机使用"
+        error "请在落地机脚本中修改“中转机 AWG 监听端口”，或重跑菜单的“修正中转端口并重新生成节点”。"
+        return 1
+    fi
+    if jq -e --argjson ss "$ss_listen" \
+       '[.landings[]? | .ports[]? | select(.proto == "tcp" and .listen == $ss)] | length > 0' \
+       "${CONFIG_FILE}" &>/dev/null; then
+        error "SS 中转监听端口冲突: ${ss_listen}/tcp 已被其他落地机使用"
+        error "请在落地机脚本中修改“中转机 SS 备轨监听端口”，或重跑菜单的“修正中转端口并重新生成节点”。"
         return 1
     fi
     
@@ -410,7 +420,7 @@ add_landing() {
           .landings += [landing_obj]
        end' \
        "${CONFIG_FILE}" > "${tmp_file}" 2>/dev/null; then
-        error "jq ${action}落地机失败"
+        error "jq 添加落地机失败"
         rm -f "${tmp_file}"
         return 1
     fi
@@ -424,7 +434,7 @@ add_landing() {
     
     mv "${tmp_file}" "${CONFIG_FILE}"
     
-    success "已${action}落地机: ${name} (${ip})，监听 ${awg_listen}/udp→${awg_target}, ${ss_listen}/tcp→${ss_target}"
+    success "已添加落地机: ${name} (${ip})，监听 ${awg_listen}/udp→${awg_target}, ${ss_listen}/tcp→${ss_target}"
 }
 
 
@@ -1220,27 +1230,41 @@ cmd_add_landing() {
         fi
     done
     
-    local action="添加"
     if jq -e --arg ip "$ip" \
        '[.landings[]? | select(.ip == $ip)] | length > 0' \
        "${CONFIG_FILE}" >/dev/null; then
-        action="更新"
-        echo "⚠️  落地机 IP ${ip} 已存在，将更新端口映射"
+        echo "✗ 落地机 IP 已存在: ${ip}"
+        echo "  为防止落地机导入命令覆盖旧映射，本次拒绝执行。"
+        echo "  请先运行: ghost-transit-ctl status"
+        echo "  如果这是新落地机，请修改落地机 IP；如果只是节点端口填错，请在落地机菜单选择“修正中转端口并重新生成节点”。"
+        exit 1
     fi
 
-    if jq -e --arg ip "$ip" --argjson awg "$awg_listen" --argjson ss "$ss_listen" \
-       '[.landings[]? | select(.ip != $ip) | .ports[]? | select(.listen == $awg or .listen == $ss)] | length > 0' \
+    if jq -e --argjson awg "$awg_listen" \
+       '[.landings[]? | .ports[]? | select(.proto == "udp" and .listen == $awg)] | length > 0' \
        "${CONFIG_FILE}" >/dev/null; then
-        echo "✗ 监听端口 ${awg_listen} 或 ${ss_listen} 已被其他落地机使用"
+        echo "✗ AWG 中转监听端口冲突: ${awg_listen}/udp 已被其他落地机使用"
+        echo "  请修改落地机脚本里的“中转机 AWG 监听端口”，对应参数: --awg-listen"
+        echo "  修改后重新生成节点，再复制新的中转机命令。"
+        exit 1
+    fi
+    if jq -e --argjson ss "$ss_listen" \
+       '[.landings[]? | .ports[]? | select(.proto == "tcp" and .listen == $ss)] | length > 0' \
+       "${CONFIG_FILE}" >/dev/null; then
+        echo "✗ SS 中转监听端口冲突: ${ss_listen}/tcp 已被其他落地机使用"
+        echo "  请修改落地机脚本里的“中转机 SS 备轨监听端口”，对应参数: --ss-listen"
+        echo "  修改后重新生成节点，再复制新的中转机命令。"
         exit 1
     fi
 
     if port_in_use udp "${awg_listen}"; then
         echo "✗ UDP 监听端口 ${awg_listen} 已被系统占用"
+        echo "  请修改参数: --awg-listen ${awg_listen}"
         exit 1
     fi
     if port_in_use tcp "${ss_listen}"; then
         echo "✗ TCP 监听端口 ${ss_listen} 已被系统占用"
+        echo "  请修改参数: --ss-listen ${ss_listen}"
         exit 1
     fi
     
@@ -1260,11 +1284,7 @@ cmd_add_landing() {
             {"listen": $ss_listen, "target": $ss_target, "proto": "tcp", "desc": "SS备轨"}
           ]
        };
-       if any(.landings[]?; .ip == $ip) then
-          (.landings[] | select(.ip == $ip)) = landing_obj
-       else
-          .landings += [landing_obj]
-       end' \
+        .landings += [landing_obj]' \
        "${CONFIG_FILE}" > "${tmp_config}"; then
         rm -f "${tmp_config}"
         echo "✗ 写入配置失败"
@@ -1278,7 +1298,7 @@ cmd_add_landing() {
     mv "${tmp_config}" "${CONFIG_FILE}"
     chmod 600 "${CONFIG_FILE}"
     
-    echo "✓ 已${action}落地机: ${name} (${ip}:${ssh_port})"
+    echo "✓ 已添加落地机: ${name} (${ip}:${ssh_port})"
     echo "  - ${awg_listen}/udp -> ${ip}:${awg_target}"
     echo "  - ${ss_listen}/tcp -> ${ip}:${ss_target}"
     if cmd_reload_rules; then
@@ -1305,7 +1325,7 @@ Ghost Transit 管理工具
   reload                    重新加载 nftables 规则（不重新生成）
   reload-rules              重新生成并加载 nftables 规则（健康检查使用）
   add-landing <IP> [名称] [SSH端口] [--awg-listen P] [--awg-target P] [--ss-listen P] [--ss-target P]
-                              IP 已存在时更新名称和端口映射
+                              IP 或监听端口已存在时拒绝执行，避免覆盖旧映射
   add-port                  已废弃：端口必须跟随落地机配置
   help                      显示此帮助信息
 

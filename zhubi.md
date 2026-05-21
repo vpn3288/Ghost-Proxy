@@ -1,5 +1,18 @@
 # Ghost-Proxy 审核记录
 
+# v6.71 版本 (2026-05-21)
+
+- ✅ 修复多落地机场景：落地机重跑时优先复用 `metadata.json` 中的中转监听端口，避免 ARM/x86 节点都回落到 `61820/18389`。
+- ✅ 落地机已安装菜单新增“修正中转端口并重新生成节点（不重装服务）”，用于把节点端口对齐中转机 `ghost-transit-ctl` 实际映射。
+- ✅ `--regenerate-nodes` 支持只重建 Sub-Store YAML/JSON、Mihomo Profile 和 SS URI，不重启 AWG/SS 服务。
+- ✅ 落地机覆盖旧节点前增加确认提示，避免误把可用节点覆盖成错误端口。
+- ✅ 中转机 `ghost-transit-ctl add-landing` 遇到已有落地机 IP、AWG/SS 监听端口冲突或系统端口占用时直接拒绝，并提示修改 `--awg-listen` / `--ss-listen`。
+- ✅ 新增 `install_landing_v6.71.sh`、`install_transit_v6.71.sh`、`install_amneziawg_dkms_v6.71.sh`，并清理 v6.70 快照。
+- ✅ 实机修复 ARM 落地机 `132.145.191.90`：节点端口修正为中转机实际映射 `51821/8390`，`verify_installation.sh landing` 0 警告。
+- ✅ 本机 Mihomo 实测 ARM 节点：强制主轨 `主轨-UDP极速` 和备轨 `备轨-TCP稳定` 访问 Cloudflare 204 均成功。
+- ✅ 中转机实测冲突保护：重复添加 ARM IP 被拒绝；复用 `51821/udp` 被拒绝，并提示修改 `--awg-listen`。
+- ✅ 实机验证：中转机 `verify_installation.sh transit` 0 警告，ARM 落地机 `verify_installation.sh landing` 0 警告。
+
 # v6.70 版本 (2026-05-21)
 
 - ✅ 新增 `install_landing_v6.70.sh`、`install_transit_v6.70.sh`、`install_amneziawg_dkms_v6.70.sh`，并同步稳定入口到 v6.70；清理 v6.69 快照，仓库继续只保留最新快照。
