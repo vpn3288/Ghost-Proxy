@@ -1,5 +1,11 @@
 # Ghost-Proxy 审核记录
 
+# 仓库整理 (2026-05-21)
+
+- ✅ 清理 `v6.55` 至 `v6.67` 历史脚本快照，仓库只保留稳定入口和最新 `v6.68` 三个版本快照；旧版本通过 Git 历史回溯。
+- ✅ README 当前稳定版本和项目结构同步到 `v6.68`。
+- ✅ 不改动安装逻辑、不改变中转纯 nftables、落地 AWG+SS 双轨和 Base64/Sub-Store 输出。
+
 # v6.68 版本 (2026-05-21)
 
 - ✅ 新增 `install_landing_v6.68.sh`、`install_transit_v6.68.sh`、`install_amneziawg_dkms_v6.68.sh`，并同步稳定入口到 v6.68。
