@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.77.sh — 落地机安装脚本
-# 版本: v6.77 (2026-05-21)
-# v6.77 - 修复 BLUE 未定义导致安装完成输出中断，并同步已安装菜单的三条命令用途说明。
+# install_landing_v6.78.sh — 落地机安装脚本
+# 版本: v6.78 (2026-05-21)
+# v6.78 - 用户入口收敛为唯一可用的完整 Clash Meta 配置。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.77"
+VERSION="6.78"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
@@ -283,16 +283,10 @@ show_generated_nodes() {
     done
     echo ""
 
-    echo -e "${GREEN}复制下面三条命令，可从头到尾完整显示对应文件:${NC}"
+    echo -e "${GREEN}复制下面这条命令，可从头到尾完整显示可导入配置:${NC}"
     echo ""
     echo -e "${RED}直接导入 Clash Meta / Mihomo 的完整双轨配置：${NC}"
-    echo "cat ${CONFIG_DIR}/mihomo-profile.yaml"
-    echo ""
-    echo -e "${BLUE}复制到 Sub-Store 的 provider 节点文件（主轨/备轨）：${NC}"
-    echo "cat ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
-    echo ""
-    echo -e "${GREEN}复制到浏览器分流 JS 的 GHOST_STATIC_PROXIES 常量：${NC}"
-    echo "cat ${CONFIG_DIR}/ghost-static-proxies.js"
+    echo "cat ${CONFIG_DIR}/clash-meta-config.yaml"
 }
 
 generated_nodes_exist() {
@@ -2900,7 +2894,7 @@ EOF
     # v6.16 新增：创建快捷命令方便用户重新查看配置
 cat > /usr/local/bin/show-clash-config <<'EOF'
 #!/usr/bin/env bash
-exec cat /etc/landing-ghost/mihomo-profile.yaml
+exec cat /etc/landing-ghost/clash-meta-config.yaml
 EOF
     chmod +x /usr/local/bin/show-clash-config
     success "已创建快捷命令: show-clash-config"
@@ -2909,19 +2903,11 @@ cat > /usr/local/bin/show-ghost-nodes <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 RED='\033[0;31m'
-BLUE='\033[0;34m'
-GREEN='\033[0;32m'
 NC='\033[0m'
-echo "直接复制下面三条命令查看完整文件："
+echo "直接复制下面这条命令查看完整可导入配置："
 echo
 echo -e "${RED}直接导入 Clash Meta / Mihomo 的完整双轨配置：${NC}"
-echo "cat /etc/landing-ghost/mihomo-profile.yaml"
-echo
-echo -e "${BLUE}复制到 Sub-Store 的 provider 节点文件（主轨/备轨）：${NC}"
-echo "cat /etc/landing-ghost/substore-awg-for-mihomo.yaml"
-echo
-echo -e "${GREEN}复制到浏览器分流 JS 的 GHOST_STATIC_PROXIES 常量：${NC}"
-echo "cat /etc/landing-ghost/ghost-static-proxies.js"
+echo "cat /etc/landing-ghost/clash-meta-config.yaml"
 echo
 EOF
     chmod +x /usr/local/bin/show-ghost-nodes
@@ -2931,29 +2917,13 @@ EOF
     echo "完整文件查看命令（复制执行即可从头到尾显示）："
     echo ""
     echo -e "${RED}直接导入 Clash Meta / Mihomo 的完整双轨配置：${NC}"
-    echo "cat ${CONFIG_DIR}/mihomo-profile.yaml"
-    echo ""
-    echo -e "${BLUE}复制到 Sub-Store 的 provider 节点文件（主轨/备轨）：${NC}"
-    echo "cat ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
-    echo ""
-    echo -e "${GREEN}复制到浏览器分流 JS 的 GHOST_STATIC_PROXIES 常量：${NC}"
-    echo "cat ${CONFIG_DIR}/ghost-static-proxies.js"
+    echo "cat ${CONFIG_DIR}/clash-meta-config.yaml"
     echo ""
     echo -e "${RED}⚠️  安全提示：${NC}"
     echo "  - 配置包含敏感信息（密钥、密码），请勿分享给他人"
     echo "  - 混淆参数为静态配置，重装前不会改变（无需重新复制配置）"
-    echo "  - 直接导入 Clash Meta/Mihomo：执行第一条命令，复制完整输出"
-    echo "  - Sub-Store provider：执行第二条命令，复制完整输出"
-    echo "  - 浏览器分流 JS：执行第三条命令，用完整输出替换原 JS 里的 GHOST_STATIC_PROXIES"
-    echo "  - 如果 Sub-Store 或 GLOBAL 组里出现 AWG-Tunnel，说明把完整 Profile 或 AWG 底层对象导入错位置了"
-    echo "  - 带分割标志的完整复制文件: ${CONFIG_DIR}/substore-copy.txt"
-    echo "  - Profile 已保存到: ${CONFIG_DIR}/mihomo-profile.yaml"
-    echo "  - 静态 AWG 隧道已保存到: ${CONFIG_DIR}/mihomo-static-awg-proxy.yaml"
-    echo "  - GHOST_STATIC_PROXIES JS 对象已保存到: ${CONFIG_DIR}/mihomo-static-awg-proxy.js"
-    echo "  - GHOST_STATIC_PROXIES JS 常量已保存到: ${CONFIG_DIR}/ghost-static-proxies.js"
-    echo "  - Sub-Store Provider YAML 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
-    echo "  - Sub-Store Provider JSON 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
-    echo "  - 完整可运行配置已保存到: ${CONFIG_DIR}/clash-meta-config.yaml"
+    echo "  - 只使用上面这一条命令输出的 ${CONFIG_DIR}/clash-meta-config.yaml"
+    echo "  - 其他 YAML/JSON/JS 文件仅保留给调试和历史兼容，不作为用户导入入口"
     echo "  - 安装后验证: curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/verify_installation.sh | bash -s landing"
     echo ""
     

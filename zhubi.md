@@ -1,5 +1,13 @@
 # Ghost-Proxy 审核记录
 
+# v6.78 版本 (2026-05-21)
+
+- ✅ 根据实测反馈，用户导入入口收敛为唯一可用的完整配置：`/etc/landing-ghost/clash-meta-config.yaml`。
+- ✅ 安装完成输出、`show-ghost-nodes`、`show-clash-config` 均只指向 `clash-meta-config.yaml`。
+- ✅ 其他 YAML/JSON/JS 文件继续生成用于调试和历史兼容，但不再作为用户导入入口展示。
+- ✅ ARM 落地机 `132.145.191.90` 实机重建节点确认：安装完成输出和 `show-ghost-nodes` 只显示 `cat /etc/landing-ghost/clash-meta-config.yaml`，`show-clash-config` 输出完整配置。
+- ✅ 新增 `install_landing_v6.78.sh`、`install_transit_v6.78.sh`、`install_amneziawg_dkms_v6.78.sh`，并清理 v6.77 快照。
+
 # v6.77 版本 (2026-05-21)
 
 - ✅ 修复安装完成输出 `${BLUE}` 未定义导致 `set -u` 中断的问题。
