@@ -1,5 +1,14 @@
 # Ghost-Proxy 审核记录
 
+# v6.87 版本 (2026-05-21)
+
+- ✅ 修复 P1：`substore-import-guide.txt` 与 README 明确 Sub-Store 输出必须保持 Clash 格式，不要转 Surge/Stash/Sing-box；补充 provider `health-check`、策略组 `exclude-filter` 和 Base64/Provider/Profile 不混用提示。
+- ✅ 修复 P1：落地机 `GHOST_LANDING_INPUT` 改为先写入 `GHOST_LANDING_INPUT_NEW` 临时链，再插入 INPUT 第 1 位并切换旧链，降低重跑脚本或 Docker/1Panel 重插规则时的短暂暴露窗口。
+- ✅ 增强验证：`verify_installation.sh` 增加 Sub-Store 导入指南必须包含“保持 Clash 格式”的检查。
+- ✅ 审查裁决：Go 1.24.4 固定工具链与 v6.85 Release 预编译产物在 v6.85/v6.86 已修复，本轮不重复改；自动改 DNS、fail2ban、默认 IPv6 备用轨、定时混淆轮换均暂不采纳，避免破坏 1Panel/Docker/证书申请或增加运维复杂度。
+- ✅ 新增 `install_landing_v6.87.sh`、`install_transit_v6.87.sh`、`install_amneziawg_dkms_v6.87.sh`，稳定入口同步到 v6.87。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.87.sh`、`install_transit_v6.87.sh`、`install_amneziawg_dkms_v6.87.sh` 均通过；`dd_debian.sh --arch amd64/arm64` 纯打印模式通过；本地非实机环境执行 `verify_installation.sh landing/transit` 因缺少 `/etc/landing-ghost`、`nft`、`jq` 与 systemd 服务失败，未记为实机验证通过。
+
 # v6.86 版本 (2026-05-21)
 
 - ✅ 修复 P1：v6.85 Release 预编译产物已生成，`versions.conf` 回填 amd64/arm64 的 `amneziawg-go` 与 `awg-tools` URL/SHA256。

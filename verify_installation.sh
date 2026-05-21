@@ -152,7 +152,8 @@ verify_landing() {
     if [[ -s /etc/landing-ghost/substore-import-guide.txt ]] \
         && grep -Fq "substore-provider-only.yaml" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "mihomo-static-awg-proxy.yaml" /etc/landing-ghost/substore-import-guide.txt \
-        && grep -Fq "exclude-filter: '^AWG-Tunnel$'" /etc/landing-ghost/substore-import-guide.txt; then
+        && grep -Fq "exclude-filter: '^AWG-Tunnel$'" /etc/landing-ghost/substore-import-guide.txt \
+        && grep -Fq "输出格式必须保持 Clash" /etc/landing-ghost/substore-import-guide.txt; then
         ok "Sub-Store / ClashMeta 导入指南完整"
     else
         fail "Sub-Store / ClashMeta 导入指南缺失或关键提示不完整"

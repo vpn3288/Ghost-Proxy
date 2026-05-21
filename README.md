@@ -6,19 +6,19 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.86`
+当前稳定版本：`v6.87`
 
 仓库保留稳定入口和最新审查版本快照。旧版本通过 Git 历史回溯，默认使用无版本后缀的稳定入口。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.86
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.86
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.86
-install_transit_v6.86.sh        # v6.86 中转机版本快照
-install_landing_v6.86.sh        # v6.86 落地机版本快照
-install_amneziawg_dkms_v6.86.sh # v6.86 DKMS 版本快照
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.87
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.87
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.87
+install_transit_v6.87.sh        # v6.87 中转机版本快照
+install_landing_v6.87.sh        # v6.87 落地机版本快照
+install_amneziawg_dkms_v6.87.sh # v6.87 DKMS 版本快照
 dd_debian.sh                    # Debian 12.14 DD 辅助命令生成器，默认不执行
 verify_installation.sh          # 安装后验证脚本
 versions.conf                   # 依赖和上游源码 ref 固定配置
@@ -100,6 +100,7 @@ cat /etc/landing-ghost/clash-meta-subscription.txt
 ```
 
 2. Sub-Store 节点 Provider：推荐使用 provider-only 分离法。先在 ClashMeta/Mihomo 基础配置静态注入 `AWG-Tunnel`，再让 Sub-Store 只输出主轨/备轨。
+Sub-Store 输出格式必须保持 Clash，不要转成 Surge/Stash/Sing-box，否则 `dialer-proxy` 可能被丢弃。
 
 ```bash
 cat /etc/landing-ghost/mihomo-static-awg-proxy.yaml
@@ -116,12 +117,19 @@ proxy-providers:
     url: "你的 Sub-Store 输出链接"
     path: ./providers/ghost.yaml
     exclude-filter: '^AWG-Tunnel$'
+    health-check:
+      enable: true
+      url: https://cp.cloudflare.com/generate_204
+      interval: 300
 
 proxy-groups:
   - name: 自动切换
     type: fallback
     use: [ghost]
     filter: '^(主轨-UDP极速|备轨-TCP稳定)$'
+    exclude-filter: '^AWG-Tunnel$'
+    url: https://cp.cloudflare.com/generate_204
+    interval: 300
 ```
 
 3. 自洽 Provider：只在确认 Sub-Store/客户端保留 `hidden` 和 `dialer-proxy` 字段时使用。
@@ -130,7 +138,7 @@ proxy-groups:
 cat /etc/landing-ghost/substore-awg-for-mihomo.yaml
 ```
 
-`substore-mihomo-full.yaml` 是完整 Mihomo Profile，可用于直导或完整模板，不要当作 Sub-Store 节点 Provider。
+`substore-mihomo-full.yaml` 是完整 Mihomo Profile，可用于直导或完整模板，不要当作 Sub-Store 节点 Provider。Base64、Provider YAML、完整 Profile 不要混进同一个订阅入口。
 
 ## 版本固定（可选）
 
