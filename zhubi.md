@@ -1,5 +1,15 @@
 # Ghost-Proxy 审核记录
 
+# v6.74 版本 (2026-05-21)
+
+- ✅ 新增 `mihomo-static-awg-proxy.js`：输出可直接粘贴到浏览器分流 JS `GHOST_STATIC_PROXIES` 的 AWG-Tunnel JSON 对象。
+- ✅ 完整 Mihomo Profile 与静态 AWG 均保留 `hidden: true`，底层 `AWG-Tunnel` 不作为用户可选出口。
+- ✅ 所有可复制分割标志改成对应格式注释：YAML 使用 `# =====`，JS 使用 `// =====`，避免复制标志导致 Clash Meta 报错。
+- ✅ `substore-copy.txt` 只保留 Sub-Store 主/备 provider 与 `GHOST_STATIC_PROXIES` JS 对象，避免把静态 AWG YAML 或 JSON 误当订阅导入。
+- ✅ 终端提示明确：完整 Profile 只能直接导入 Mihomo；Sub-Store 只导入 `SUBSTORE_PROVIDER_YAML`，如果 Sub-Store 里出现 `AWG-Tunnel` 就是导入错了。
+- ✅ `verify_installation.sh` 增加静态 AWG JS 对象格式检查和新分割标志检查。
+- ✅ 新增 `install_landing_v6.74.sh`、`install_transit_v6.74.sh`、`install_amneziawg_dkms_v6.74.sh`，并清理 v6.73 快照。
+
 # v6.72 版本 (2026-05-21)
 
 - ✅ 拆分 Sub-Store 输出：`MIHOMO_STATIC_AWG_PROXY` 只放底层 `AWG-Tunnel`，`SUBSTORE_PROVIDER_YAML/JSON` 只放用户可见的主轨/备轨节点。

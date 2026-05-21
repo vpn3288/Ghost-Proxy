@@ -73,6 +73,24 @@ verify_landing() {
         fail "Mihomo 静态 AWG 隧道缺失: /etc/landing-ghost/mihomo-static-awg-proxy.yaml"
     fi
 
+    if [[ -s /etc/landing-ghost/mihomo-static-awg-proxy.js ]]; then
+        local static_awg_js_ok=1
+        for json_key in AWG-Tunnel wireguard amnezia-wg-option allowed-ips hidden; do
+            if ! grep -Fq "${json_key}" /etc/landing-ghost/mihomo-static-awg-proxy.js; then
+                fail "GHOST_STATIC_PROXIES JS 对象缺少: ${json_key}"
+                static_awg_js_ok=0
+            fi
+        done
+        if ! jq -e '.name == "AWG-Tunnel" and .type == "wireguard" and .hidden == true and ."amnezia-wg-option"' \
+            /etc/landing-ghost/mihomo-static-awg-proxy.js >/dev/null; then
+            fail "GHOST_STATIC_PROXIES JS 对象格式异常"
+            static_awg_js_ok=0
+        fi
+        [[ "${static_awg_js_ok}" -eq 0 ]] || ok "GHOST_STATIC_PROXIES JS 对象完整"
+    else
+        fail "GHOST_STATIC_PROXIES JS 对象缺失: /etc/landing-ghost/mihomo-static-awg-proxy.js"
+    fi
+
     if [[ -s /etc/landing-ghost/substore-awg-for-mihomo.yaml ]]; then
         local substore_yaml_ok=1
         for yaml_key in 主轨-UDP极速 备轨-TCP稳定 dialer-proxy; do
@@ -112,12 +130,10 @@ verify_landing() {
     fi
 
     if [[ -s /etc/landing-ghost/substore-copy.txt ]] \
-        && grep -Fq "===== MIHOMO_STATIC_AWG_PROXY_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== MIHOMO_STATIC_AWG_PROXY_END =====" /etc/landing-ghost/substore-copy.txt \
         && grep -Fq "===== SUBSTORE_PROVIDER_YAML_START =====" /etc/landing-ghost/substore-copy.txt \
         && grep -Fq "===== SUBSTORE_PROVIDER_YAML_END =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_PROVIDER_JSON_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_PROVIDER_JSON_END =====" /etc/landing-ghost/substore-copy.txt; then
+        && grep -Fq "===== GHOST_STATIC_PROXIES_JS_OBJECT_START =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== GHOST_STATIC_PROXIES_JS_OBJECT_END =====" /etc/landing-ghost/substore-copy.txt; then
         ok "Sub-Store 复制文件分割标志完整"
     else
         fail "Sub-Store 复制文件缺失或分割标志不完整"

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.72.sh — 落地机安装脚本
-# 版本: v6.72 (2026-05-21)
-# v6.72 - 拆分 Sub-Store 可见节点与 Mihomo 静态 AWG 隧道，避免 GLOBAL 混入底层隧道。
+# install_landing_v6.74.sh — 落地机安装脚本
+# 版本: v6.74 (2026-05-21)
+# v6.74 - 修复复制标记导致 Mihomo/Sub-Store 解析失败；区分直接导入 Profile 与 Sub-Store provider。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.72"
+VERSION="6.74"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
@@ -186,7 +186,7 @@ uninstall() {
         
         if command -v shred >/dev/null 2>&1 && [[ -d "${CONFIG_DIR}" ]]; then
             find "${CONFIG_DIR}" -maxdepth 1 -type f \
-                \( -name 'clash-meta-config.yaml' -o -name 'mihomo-profile.yaml' -o -name 'substore-copy.txt' -o -name 'mihomo-static-awg-proxy.yaml' -o -name 'substore-awg-for-mihomo.yaml' -o -name 'substore-awg-for-mihomo-jsonlines.txt' -o -name 'clash-meta-proxies.yaml' -o -name 'clash-meta-substore-nodes.txt' -o -name 'client-config.txt' -o -name 'ss-backup-uri.txt' -o -name 'ss-main.json' -o -name 'ss-backup.json' -o -name 'metadata.json' \) \
+                \( -name 'clash-meta-config.yaml' -o -name 'mihomo-profile.yaml' -o -name 'substore-copy.txt' -o -name 'mihomo-static-awg-proxy.yaml' -o -name 'mihomo-static-awg-proxy.js' -o -name 'substore-awg-for-mihomo.yaml' -o -name 'substore-awg-for-mihomo-jsonlines.txt' -o -name 'clash-meta-proxies.yaml' -o -name 'clash-meta-substore-nodes.txt' -o -name 'client-config.txt' -o -name 'ss-backup-uri.txt' -o -name 'ss-main.json' -o -name 'ss-backup.json' -o -name 'metadata.json' \) \
                 -exec shred -u -n 1 -z {} \; 2>/dev/null || true
         fi
         rm -rf "${CONFIG_DIR}"
@@ -271,6 +271,7 @@ show_generated_nodes() {
         "${CONFIG_DIR}/mihomo-profile.yaml" \
         "${CONFIG_DIR}/substore-copy.txt" \
         "${CONFIG_DIR}/mihomo-static-awg-proxy.yaml" \
+        "${CONFIG_DIR}/mihomo-static-awg-proxy.js" \
         "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" \
         "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" \
         "${CONFIG_DIR}/clash-meta-proxies.yaml" \
@@ -281,23 +282,26 @@ show_generated_nodes() {
     echo ""
 
     if [[ -s "${CONFIG_DIR}/mihomo-static-awg-proxy.yaml" ]]; then
-        echo "MIHOMO_STATIC_AWG_PROXY_START"
+        echo "# ===== MIHOMO_STATIC_AWG_YAML_START ====="
         cat "${CONFIG_DIR}/mihomo-static-awg-proxy.yaml"
-        echo "MIHOMO_STATIC_AWG_PROXY_END"
+        echo "# ===== MIHOMO_STATIC_AWG_YAML_END ====="
         echo ""
     fi
 
     if [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" ]]; then
-        echo "SUBSTORE_PROVIDER_YAML_START"
+        echo "# 仅给 Sub-Store provider 使用；不能作为完整 Clash Meta 配置直接导入。"
+        echo "# 主轨依赖 AWG-Tunnel，必须配合浏览器分流 JS 的 GHOST_STATIC_PROXIES 使用。"
+        echo "# ===== SUBSTORE_PROVIDER_YAML_START ====="
         cat "${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
-        echo "SUBSTORE_PROVIDER_YAML_END"
+        echo "# ===== SUBSTORE_PROVIDER_YAML_END ====="
         echo ""
     fi
 
-    if [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" ]]; then
-        echo "SUBSTORE_PROVIDER_JSON_START"
-        cat "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
-        echo "SUBSTORE_PROVIDER_JSON_END"
+    if [[ -s "${CONFIG_DIR}/mihomo-static-awg-proxy.js" ]]; then
+        echo "// 仅粘贴到浏览器分流 JS 的 GHOST_STATIC_PROXIES 数组内；不能直接导入 Clash Meta。"
+        echo "// ===== GHOST_STATIC_PROXIES_JS_OBJECT_START ====="
+        cat "${CONFIG_DIR}/mihomo-static-awg-proxy.js"
+        echo "// ===== GHOST_STATIC_PROXIES_JS_OBJECT_END ====="
         echo ""
     fi
 
@@ -316,6 +320,7 @@ generated_nodes_exist() {
     [[ -s "${CONFIG_DIR}/mihomo-profile.yaml" ]] \
         || [[ -s "${CONFIG_DIR}/substore-copy.txt" ]] \
         || [[ -s "${CONFIG_DIR}/mihomo-static-awg-proxy.yaml" ]] \
+        || [[ -s "${CONFIG_DIR}/mihomo-static-awg-proxy.js" ]] \
         || [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" ]] \
         || [[ -s "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" ]] \
         || [[ -s "${CONFIG_DIR}/clash-meta-config.yaml" ]]
@@ -349,6 +354,7 @@ delete_generated_nodes() {
         "${CONFIG_DIR}/mihomo-profile.yaml" \
         "${CONFIG_DIR}/substore-copy.txt" \
         "${CONFIG_DIR}/mihomo-static-awg-proxy.yaml" \
+        "${CONFIG_DIR}/mihomo-static-awg-proxy.js" \
         "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" \
         "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" \
         "${CONFIG_DIR}/clash-meta-proxies.yaml" \
@@ -2592,6 +2598,51 @@ YAML
     chmod 600 "${CONFIG_DIR}/mihomo-static-awg-proxy.yaml"
     success "Mihomo 静态 AWG 隧道已生成: ${CONFIG_DIR}/mihomo-static-awg-proxy.yaml"
 
+    info "生成 GHOST_STATIC_PROXIES 可粘贴 JS 对象..."
+    jq -n \
+        --arg name "AWG-Tunnel" \
+        --arg server "${TRANSIT_IP}" \
+        --arg ip "10.8.0.2" \
+        --arg private_key "${AWG_CLIENT_PRIVATE}" \
+        --arg public_key "${AWG_SERVER_PUBLIC}" \
+        --argjson port "${TRANSIT_AWG_LISTEN_PORT}" \
+        --argjson mtu "${OPTIMAL_MTU}" \
+        --argjson jc "${JC}" \
+        --argjson jmin "${JMIN}" \
+        --argjson jmax "${JMAX}" \
+        --argjson s1 "${S1}" \
+        --argjson s2 "${S2}" \
+        --argjson h1 "${H1}" \
+        --argjson h2 "${H2}" \
+        --argjson h3 "${H3}" \
+        --argjson h4 "${H4}" \
+        '{
+            name: $name,
+            type: "wireguard",
+            server: $server,
+            port: $port,
+            ip: $ip,
+            "private-key": $private_key,
+            "public-key": $public_key,
+            hidden: true,
+            udp: true,
+            mtu: $mtu,
+            "allowed-ips": ["10.8.0.0/24"],
+            "amnezia-wg-option": {
+                jc: $jc,
+                jmin: $jmin,
+                jmax: $jmax,
+                s1: $s1,
+                s2: $s2,
+                h1: $h1,
+                h2: $h2,
+                h3: $h3,
+                h4: $h4
+            }
+        }' > "${CONFIG_DIR}/mihomo-static-awg-proxy.js"
+    chmod 600 "${CONFIG_DIR}/mihomo-static-awg-proxy.js"
+    success "GHOST_STATIC_PROXIES JS 对象已生成: ${CONFIG_DIR}/mihomo-static-awg-proxy.js"
+
     info "生成 Sub-Store 可见节点 Provider YAML..."
     cat > "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" <<YAML
 proxies:
@@ -2661,17 +2712,16 @@ YAML
           "${CONFIG_DIR}/ss-backup-uri-base64.txt"
 
     {
-        echo "===== MIHOMO_STATIC_AWG_PROXY_START ====="
-        cat "${CONFIG_DIR}/mihomo-static-awg-proxy.yaml"
-        echo "===== MIHOMO_STATIC_AWG_PROXY_END ====="
-        echo
-        echo "===== SUBSTORE_PROVIDER_YAML_START ====="
+        echo "# 仅给 Sub-Store provider 使用；不能作为完整 Clash Meta 配置直接导入。"
+        echo "# 主轨依赖 AWG-Tunnel，必须配合浏览器分流 JS 的 GHOST_STATIC_PROXIES 使用。"
+        echo "# ===== SUBSTORE_PROVIDER_YAML_START ====="
         cat "${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
-        echo "===== SUBSTORE_PROVIDER_YAML_END ====="
+        echo "# ===== SUBSTORE_PROVIDER_YAML_END ====="
         echo
-        echo "===== SUBSTORE_PROVIDER_JSON_START ====="
-        cat "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
-        echo "===== SUBSTORE_PROVIDER_JSON_END ====="
+        echo "// 仅粘贴到浏览器分流 JS 的 GHOST_STATIC_PROXIES 数组内；不能直接导入 Clash Meta。"
+        echo "// ===== GHOST_STATIC_PROXIES_JS_OBJECT_START ====="
+        cat "${CONFIG_DIR}/mihomo-static-awg-proxy.js"
+        echo "// ===== GHOST_STATIC_PROXIES_JS_OBJECT_END ====="
     } > "${CONFIG_DIR}/substore-copy.txt"
     chmod 600 "${CONFIG_DIR}/substore-copy.txt"
     success "Sub-Store 复制文件已生成: ${CONFIG_DIR}/substore-copy.txt"
@@ -2869,6 +2919,10 @@ EOF
 cat > /usr/local/bin/show-ghost-nodes <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+echo "# ===== MIHOMO_FULL_PROFILE_START ====="
+cat /etc/landing-ghost/mihomo-profile.yaml 2>/dev/null || true
+echo "# ===== MIHOMO_FULL_PROFILE_END ====="
+echo
 cat /etc/landing-ghost/substore-copy.txt 2>/dev/null || true
 echo
 echo "== 备轨 SS URI =="
@@ -2878,22 +2932,25 @@ EOF
     chmod +x /usr/local/bin/show-ghost-nodes
     success "已创建快捷命令: show-ghost-nodes"
     
-    # 默认直接打印 Sub-Store 可用的 YAML 与逐行 JSON。
+    # 默认先打印完整可用 Mihomo Profile，Sub-Store 拆分内容作为高级备用。
+    echo ""
+    echo "# ===== MIHOMO_FULL_PROFILE_START ====="
+    cat "${CONFIG_DIR}/mihomo-profile.yaml"
+    echo "# ===== MIHOMO_FULL_PROFILE_END ====="
     echo ""
     cat "${CONFIG_DIR}/substore-copy.txt"
-    echo ""
-    echo "MIHOMO_PROFILE_START"
-    cat "${CONFIG_DIR}/mihomo-profile.yaml"
-    echo "MIHOMO_PROFILE_END"
     echo ""
     echo -e "${RED}⚠️  安全提示：${NC}"
     echo "  - 配置包含敏感信息（密钥、密码），请勿分享给他人"
     echo "  - 混淆参数为静态配置，重装前不会改变（无需重新复制配置）"
-    echo "  - Mihomo 配置脚本填入 MIHOMO_STATIC_AWG_PROXY_START/END 的 AWG-Tunnel"
-    echo "  - Sub-Store 只导入 SUBSTORE_PROVIDER_YAML_START/END 的主轨/备轨可见节点"
+    echo "  - 直接导入 Clash Meta/Mihomo：只复制 MIHOMO_FULL_PROFILE 这一整段"
+    echo "  - Sub-Store：只复制 SUBSTORE_PROVIDER_YAML；它必须配合浏览器分流 JS 的 GHOST_STATIC_PROXIES 使用"
+    echo "  - GHOST_STATIC_PROXIES：只粘贴 GHOST_STATIC_PROXIES_JS_OBJECT 到 JS 数组内，不能导入 Clash Meta"
+    echo "  - 如果 Sub-Store 或 GLOBAL 组里出现 AWG-Tunnel，说明把完整 Profile 或 AWG 底层对象导入错位置了"
     echo "  - 带分割标志的完整复制文件: ${CONFIG_DIR}/substore-copy.txt"
     echo "  - Profile 已保存到: ${CONFIG_DIR}/mihomo-profile.yaml"
     echo "  - 静态 AWG 隧道已保存到: ${CONFIG_DIR}/mihomo-static-awg-proxy.yaml"
+    echo "  - GHOST_STATIC_PROXIES JS 对象已保存到: ${CONFIG_DIR}/mihomo-static-awg-proxy.js"
     echo "  - Sub-Store Provider YAML 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
     echo "  - Sub-Store Provider JSON 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
     echo "  - 完整可运行配置已保存到: ${CONFIG_DIR}/clash-meta-config.yaml"

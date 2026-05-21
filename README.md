@@ -6,19 +6,19 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.72`
+当前稳定版本：`v6.74`
 
 仓库保留稳定入口和最新审查版本快照。旧版本通过 Git 历史回溯，默认使用无版本后缀的稳定入口。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.72
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.72
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.72
-install_transit_v6.72.sh        # v6.72 中转机版本快照
-install_landing_v6.72.sh        # v6.72 落地机版本快照
-install_amneziawg_dkms_v6.72.sh # v6.72 DKMS 版本快照
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.74
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.74
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.74
+install_transit_v6.74.sh        # v6.74 中转机版本快照
+install_landing_v6.74.sh        # v6.74 落地机版本快照
+install_amneziawg_dkms_v6.74.sh # v6.74 DKMS 版本快照
 dd_debian.sh                    # Debian 12.14 DD 辅助命令生成器，默认不执行
 verify_installation.sh          # 安装后验证脚本
 versions.conf                   # 依赖和上游源码 ref 固定配置
@@ -132,7 +132,8 @@ bash install_landing.sh --uninstall
 
 ## 关键说明
 
-- 不提供 HTTP 订阅服务；落地机安装完成后直接打印 Sub-Store Clash Proxies YAML 和逐行 JSON。
+- 不提供 HTTP 订阅服务；落地机安装完成后直接打印完整 Mihomo Profile、Sub-Store 可见主/备 provider、以及浏览器分流 JS 可粘贴的 `GHOST_STATIC_PROXIES` AWG 对象。
+- 直接导入 Clash Meta/Mihomo 时只复制完整 Profile；Sub-Store 只导入主轨/备轨 provider，且必须配合浏览器分流 JS 的静态 AWG 对象使用。
 - AmneziaWG DKMS 失败时，落地机脚本会回退到支持混淆的 `amneziawg-go`。
 - 不回退到无混淆的标准 WireGuard。
 - 中转机不安装应用层代理，只负责端口转发。
