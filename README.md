@@ -6,19 +6,19 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.85`
+当前稳定版本：`v6.86`
 
 仓库保留稳定入口和最新审查版本快照。旧版本通过 Git 历史回溯，默认使用无版本后缀的稳定入口。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.85
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.85
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.85
-install_transit_v6.85.sh        # v6.85 中转机版本快照
-install_landing_v6.85.sh        # v6.85 落地机版本快照
-install_amneziawg_dkms_v6.85.sh # v6.85 DKMS 版本快照
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.86
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.86
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.86
+install_transit_v6.86.sh        # v6.86 中转机版本快照
+install_landing_v6.86.sh        # v6.86 落地机版本快照
+install_amneziawg_dkms_v6.86.sh # v6.86 DKMS 版本快照
 dd_debian.sh                    # Debian 12.14 DD 辅助命令生成器，默认不执行
 verify_installation.sh          # 安装后验证脚本
 versions.conf                   # 依赖和上游源码 ref 固定配置
@@ -145,9 +145,9 @@ bash install_landing.sh
 
 可固定字段：`DKMS_VERSION`、`GCC_VERSION`、`GOLANG_VERSION`、`GO_TOOLCHAIN_VERSION`、`GO_TOOLCHAIN_SHA256_AMD64`、`GO_TOOLCHAIN_SHA256_ARM64`、`PKG_CONFIG_VERSION`、`LIBMNL_DEV_VERSION`、`SINGBOX_VERSION`、`AWG_DKMS_REF`、`AWG_TOOLS_REF`、`AWG_GO_REF`。留空表示使用系统仓库或上游默认版本。
 
-可选预编译用户态兜底字段：`PREBUILT_AWG_GO_URL_x86_64`、`PREBUILT_AWG_GO_SHA256_x86_64`、`PREBUILT_AWG_TOOLS_URL_x86_64`、`PREBUILT_AWG_TOOLS_SHA256_x86_64`、`PREBUILT_AWG_GO_URL_arm64`、`PREBUILT_AWG_GO_SHA256_arm64`、`PREBUILT_AWG_TOOLS_URL_arm64`、`PREBUILT_AWG_TOOLS_SHA256_arm64`。未发布 Release 资产前保持留空，脚本会自动回退源码编译。
+预编译用户态兜底字段：`PREBUILT_AWG_GO_URL_x86_64`、`PREBUILT_AWG_GO_SHA256_x86_64`、`PREBUILT_AWG_TOOLS_URL_x86_64`、`PREBUILT_AWG_TOOLS_SHA256_x86_64`、`PREBUILT_AWG_GO_URL_arm64`、`PREBUILT_AWG_GO_SHA256_arm64`、`PREBUILT_AWG_TOOLS_URL_arm64`、`PREBUILT_AWG_TOOLS_SHA256_arm64`。当前默认使用 v6.85 Release 产物；下载或校验失败时，脚本会自动回退源码编译。
 
-仓库包含 `.github/workflows/build-awg.yml`，可手动触发或在 tag 发布时构建 amd64/arm64 用户态产物。Release 产物真实发布并核对 SHA256 后，再填入 `versions.conf`。
+仓库包含 `.github/workflows/build-awg.yml`，可手动触发或在 tag 发布时构建 amd64/arm64 用户态产物。更新预编译产物时，必须先发布 Release，再把真实 SHA256 回填到 `versions.conf` 和稳定入口脚本。
 
 ## 安装后验证
 

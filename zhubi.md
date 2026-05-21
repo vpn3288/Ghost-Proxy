@@ -1,5 +1,12 @@
 # Ghost-Proxy 审核记录
 
+# v6.86 版本 (2026-05-21)
+
+- ✅ 修复 P1：v6.85 Release 预编译产物已生成，`versions.conf` 回填 amd64/arm64 的 `amneziawg-go` 与 `awg-tools` URL/SHA256。
+- ✅ 修复 P1：`install_landing.sh` 内置同一组 v6.85 预编译 URL/SHA256，用户通过 `bash <(curl ...)` 运行稳定入口时也会优先尝试预编译备用轨，失败后再源码编译。
+- ✅ 新增 `install_landing_v6.86.sh`、`install_transit_v6.86.sh`、`install_amneziawg_dkms_v6.86.sh`，稳定入口同步到 v6.86。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.86.sh`、`install_transit_v6.86.sh`、`install_amneziawg_dkms_v6.86.sh` 均通过；`dd_debian.sh --arch amd64/arm64` 纯打印模式通过。
+
 # v6.85 版本 (2026-05-21)
 
 - ✅ 修复 P1：`amneziawg-go` 上游 `go.mod` 已要求 Go 1.24.4，本轮新增固定 Go 工具链版本与 amd64/arm64 SHA256，落地机源码回退在 Go 版本不足时下载校验后使用 `/opt/ghost-go/go1.24.4` 编译。
