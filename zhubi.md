@@ -1,5 +1,11 @@
 # Ghost-Proxy 审核记录
 
+# v6.84 版本 (2026-05-21)
+
+- ✅ 修复 P1：`build-awg.yml` 的 awg-tools 打包改为 `make install` 到临时根目录后打包 `awg/awg-quick`，避免源码目录没有 `awg-quick` 导致 tag 构建失败。
+- ✅ 新增 `install_landing_v6.84.sh`、`install_transit_v6.84.sh`、`install_amneziawg_dkms_v6.84.sh`，稳定入口同步到 v6.84。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.84.sh`、`install_transit_v6.84.sh`、`install_amneziawg_dkms_v6.84.sh` 均通过；`dd_debian.sh --arch amd64/arm64` 纯打印模式通过。
+
 # v6.83 版本 (2026-05-21)
 
 - ✅ 修复 P1：拆清 Mihomo 直导、Sub-Store 节点 Provider、完整 Profile 三类入口；默认提示改为 Base64 直导 + `substore-provider-only.yaml`，避免把 `substore-mihomo-full.yaml` 当 Provider。

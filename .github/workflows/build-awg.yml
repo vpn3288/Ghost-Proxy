@@ -41,7 +41,7 @@ jobs:
               set -euo pipefail
               . ./versions.conf
               apt-get update -qq
-              base_packages=(ca-certificates git build-essential make tar)
+              base_packages=(ca-certificates git build-essential bash make tar)
               if ! DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
                 "${base_packages[@]}" \
                 "golang-go=${GOLANG_VERSION}" \
@@ -64,8 +64,9 @@ jobs:
               git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-tools.git "${tmp_dir}/amneziawg-tools"
               git -C "${tmp_dir}/amneziawg-tools" fetch --depth 1 origin "${AWG_TOOLS_REF}"
               git -C "${tmp_dir}/amneziawg-tools" checkout -q FETCH_HEAD
-              make -C "${tmp_dir}/amneziawg-tools/src"
-              tar -C "${tmp_dir}/amneziawg-tools/src" -czf "dist/amneziawg-tools-linux-${{ matrix.arch }}.tar.gz" awg awg-quick
+              make -C "${tmp_dir}/amneziawg-tools/src" WITH_WGQUICK=yes
+              make -C "${tmp_dir}/amneziawg-tools/src" WITH_WGQUICK=yes DESTDIR="${tmp_dir}/tools-root" PREFIX=/usr install
+              tar -C "${tmp_dir}/tools-root/usr/bin" -czf "dist/amneziawg-tools-linux-${{ matrix.arch }}.tar.gz" awg awg-quick
             '
 
       - name: Calculate SHA256
