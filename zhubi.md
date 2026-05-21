@@ -1,5 +1,13 @@
 # Ghost-Proxy 审核记录
 
+# v6.70 版本 (2026-05-21)
+
+- ✅ 新增 `install_landing_v6.70.sh`、`install_transit_v6.70.sh`、`install_amneziawg_dkms_v6.70.sh`，并同步稳定入口到 v6.70；清理 v6.69 快照，仓库继续只保留最新快照。
+- ✅ 新增 `/etc/landing-ghost/substore-copy.txt`，文件内包含 `===== SUBSTORE_YAML_START/END =====` 与 `===== SUBSTORE_JSON_START/END =====` 分割标志。
+- ✅ `show-ghost-nodes` 与安装完成输出直接打印 `substore-copy.txt`，避免单独打开 YAML/JSON 文件时没有分割线。
+- ✅ `verify_installation.sh` 增加 `substore-copy.txt` 四个分割标志检查。
+- ✅ 实机复测：x86 落地机 `47.251.82.237` 重跑 v6.70 后 `substore-copy.txt` 与 `show-ghost-nodes` 均包含四个分割标志，验证 0 警告。
+
 # v6.69 版本 (2026-05-21)
 
 - ✅ 新增 `install_landing_v6.69.sh`、`install_transit_v6.69.sh`、`install_amneziawg_dkms_v6.69.sh`，并同步稳定入口到 v6.69；清理 v6.68 快照，仓库继续只保留最新快照。

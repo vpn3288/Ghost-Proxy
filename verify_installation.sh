@@ -90,6 +90,16 @@ verify_landing() {
         fail "Sub-Store 逐行 JSON 缺失: /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt"
     fi
 
+    if [[ -s /etc/landing-ghost/substore-copy.txt ]] \
+        && grep -Fq "===== SUBSTORE_YAML_START =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== SUBSTORE_YAML_END =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== SUBSTORE_JSON_START =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== SUBSTORE_JSON_END =====" /etc/landing-ghost/substore-copy.txt; then
+        ok "Sub-Store 复制文件分割标志完整"
+    else
+        fail "Sub-Store 复制文件缺失或分割标志不完整"
+    fi
+
     if [[ -s /etc/landing-ghost/ss-backup-uri.txt ]] && grep -Eq '^ss://.+@.+:[0-9]+#Ghost-Backup-TCP$' /etc/landing-ghost/ss-backup-uri.txt; then
         ok "备轨 SS URI 节点存在"
     else

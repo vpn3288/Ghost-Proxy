@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.69.sh — 落地机安装脚本
-# 版本: v6.69 (2026-05-21)
-# v6.69 - 删除无效 Base64 导入输出，直接打印 Sub-Store YAML 与逐行 JSON。
+# install_landing_v6.70.sh — 落地机安装脚本
+# 版本: v6.70 (2026-05-21)
+# v6.70 - 生成带分割标志的 Sub-Store 复制文件。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.69"
+VERSION="6.70"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"
@@ -186,7 +186,7 @@ uninstall() {
         
         if command -v shred >/dev/null 2>&1 && [[ -d "${CONFIG_DIR}" ]]; then
             find "${CONFIG_DIR}" -maxdepth 1 -type f \
-                \( -name 'clash-meta-config.yaml' -o -name 'mihomo-profile.yaml' -o -name 'substore-awg-for-mihomo.yaml' -o -name 'substore-awg-for-mihomo-jsonlines.txt' -o -name 'clash-meta-proxies.yaml' -o -name 'clash-meta-substore-nodes.txt' -o -name 'client-config.txt' -o -name 'ss-backup-uri.txt' -o -name 'ss-main.json' -o -name 'ss-backup.json' -o -name 'metadata.json' \) \
+                \( -name 'clash-meta-config.yaml' -o -name 'mihomo-profile.yaml' -o -name 'substore-copy.txt' -o -name 'substore-awg-for-mihomo.yaml' -o -name 'substore-awg-for-mihomo-jsonlines.txt' -o -name 'clash-meta-proxies.yaml' -o -name 'clash-meta-substore-nodes.txt' -o -name 'client-config.txt' -o -name 'ss-backup-uri.txt' -o -name 'ss-main.json' -o -name 'ss-backup.json' -o -name 'metadata.json' \) \
                 -exec shred -u -n 1 -z {} \; 2>/dev/null || true
         fi
         rm -rf "${CONFIG_DIR}"
@@ -248,6 +248,7 @@ show_generated_nodes() {
     for f in \
         "${CONFIG_DIR}/clash-meta-config.yaml" \
         "${CONFIG_DIR}/mihomo-profile.yaml" \
+        "${CONFIG_DIR}/substore-copy.txt" \
         "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" \
         "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" \
         "${CONFIG_DIR}/clash-meta-proxies.yaml" \
@@ -293,6 +294,7 @@ delete_generated_nodes() {
     rm -f \
         "${CONFIG_DIR}/clash-meta-config.yaml" \
         "${CONFIG_DIR}/mihomo-profile.yaml" \
+        "${CONFIG_DIR}/substore-copy.txt" \
         "${CONFIG_DIR}/substore-awg-for-mihomo.yaml" \
         "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt" \
         "${CONFIG_DIR}/clash-meta-proxies.yaml" \
@@ -2571,6 +2573,18 @@ YAML
           "${CONFIG_DIR}/clash-meta-subscription.txt" \
           "${CONFIG_DIR}/ss-backup-uri-base64.txt"
 
+    {
+        echo "===== SUBSTORE_YAML_START ====="
+        cat "${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
+        echo "===== SUBSTORE_YAML_END ====="
+        echo
+        echo "===== SUBSTORE_JSON_START ====="
+        cat "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
+        echo "===== SUBSTORE_JSON_END ====="
+    } > "${CONFIG_DIR}/substore-copy.txt"
+    chmod 600 "${CONFIG_DIR}/substore-copy.txt"
+    success "Sub-Store 复制文件已生成: ${CONFIG_DIR}/substore-copy.txt"
+
     local ss_userinfo ss_uri
     ss_userinfo=$(printf '%s:%s' "2022-blake3-aes-256-gcm" "${SS_PASSWORD}" | base64 | tr -d '\n')
     ss_uri="ss://${ss_userinfo}@${TRANSIT_IP}:${TRANSIT_SS_LISTEN_PORT}#Ghost-Backup-TCP"
@@ -2764,13 +2778,7 @@ EOF
 cat > /usr/local/bin/show-ghost-nodes <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-echo "SUBSTORE_YAML_START"
-cat /etc/landing-ghost/substore-awg-for-mihomo.yaml 2>/dev/null || true
-echo "SUBSTORE_YAML_END"
-echo
-echo "SUBSTORE_JSON_START"
-cat /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt 2>/dev/null || true
-echo "SUBSTORE_JSON_END"
+cat /etc/landing-ghost/substore-copy.txt 2>/dev/null || true
 echo
 echo "== 备轨 SS URI =="
 cat /etc/landing-ghost/ss-backup-uri.txt 2>/dev/null || true
@@ -2781,13 +2789,7 @@ EOF
     
     # 默认直接打印 Sub-Store 可用的 YAML 与逐行 JSON。
     echo ""
-    echo "SUBSTORE_YAML_START"
-    cat "${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
-    echo "SUBSTORE_YAML_END"
-    echo ""
-    echo "SUBSTORE_JSON_START"
-    cat "${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
-    echo "SUBSTORE_JSON_END"
+    cat "${CONFIG_DIR}/substore-copy.txt"
     echo ""
     echo "MIHOMO_PROFILE_START"
     cat "${CONFIG_DIR}/mihomo-profile.yaml"
@@ -2797,6 +2799,7 @@ EOF
     echo "  - 配置包含敏感信息（密钥、密码），请勿分享给他人"
     echo "  - 混淆参数为静态配置，重装前不会改变（无需重新复制配置）"
     echo "  - Sub-Store 推荐复制 SUBSTORE_YAML_START/END 之间的内容"
+    echo "  - 带分割标志的完整复制文件: ${CONFIG_DIR}/substore-copy.txt"
     echo "  - Profile 已保存到: ${CONFIG_DIR}/mihomo-profile.yaml"
     echo "  - Sub-Store YAML 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo.yaml"
     echo "  - Sub-Store JSON 已保存到: ${CONFIG_DIR}/substore-awg-for-mihomo-jsonlines.txt"
