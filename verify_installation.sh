@@ -98,6 +98,19 @@ verify_landing() {
         fail "Mihomo YAML 配置缺失: /etc/landing-ghost/clash-meta-config.yaml"
     fi
 
+    if [[ -s /etc/landing-ghost/mihomo-profile.yaml ]]; then
+        local profile_ok=1
+        for yaml_key in amnezia-wg-option allowed-ips dialer-proxy; do
+            if ! grep -Eq "^[[:space:]]*${yaml_key}[[:space:]]*:" /etc/landing-ghost/mihomo-profile.yaml; then
+                fail "Mihomo Profile 缺少字段: ${yaml_key}"
+                profile_ok=0
+            fi
+        done
+        [[ "${profile_ok}" -eq 0 ]] || ok "Mihomo Profile 关键字段完整"
+    else
+        fail "Mihomo Profile 缺失: /etc/landing-ghost/mihomo-profile.yaml"
+    fi
+
     if systemctl show awg-landing.service -p Environment 2>/dev/null | grep -q "amneziawg-go"; then
         ok "AWG 后端: amneziawg-go"
     elif lsmod 2>/dev/null | grep -q "^amneziawg"; then

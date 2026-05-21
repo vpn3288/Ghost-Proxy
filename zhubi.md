@@ -1,5 +1,14 @@
 # Ghost-Proxy 审核记录
 
+# v6.68 版本 (2026-05-21)
+
+- ✅ 新增 `install_landing_v6.68.sh`、`install_transit_v6.68.sh`、`install_amneziawg_dkms_v6.68.sh`，并同步稳定入口到 v6.68。
+- ✅ 落地机额外生成 `mihomo-profile.yaml`：去掉本地监听端口、`external-controller`、`external-ui`、`secret` 和长注释，作为 GUI 客户端 Profile/配置 导入专用文件。
+- ✅ 安装完成终端优先打印 `mihomo-profile.yaml` 内容，明确不能粘贴到普通“节点”导入框；Sub-Store Base64 继续保留。
+- ✅ `show-clash-config` 改为输出客户端导入专用 Profile；`show-ghost-nodes` 同步展示 Profile、Base64 和备轨 SS URI。
+- ✅ `verify_installation.sh` 增加 `mihomo-profile.yaml` 关键字段检查。
+- ✅ 实机复测：x86 落地机 `47.251.82.237` 重跑 v6.68 后生成 `mihomo-profile.yaml`；本机 Mihomo 强制主轨/备轨分别返回 204。
+
 # v6.67 版本 (2026-05-21)
 
 - ✅ 新增 `install_landing_v6.67.sh`、`install_transit_v6.67.sh`、`install_amneziawg_dkms_v6.67.sh`，并同步稳定入口到 v6.67。
