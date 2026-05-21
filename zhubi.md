@@ -1,5 +1,16 @@
 # Ghost-Proxy 审核记录
 
+# v6.64 版本 (2026-05-21)
+
+- ✅ 新增 `install_landing_v6.64.sh`、`install_transit_v6.64.sh`、`install_amneziawg_dkms_v6.64.sh`，并同步稳定入口到 v6.64。
+- ✅ 落地机已安装后再次运行脚本会进入管理菜单：添加/更新节点、显示已生成节点、删除节点文件、卸载、退出；避免重跑命令直接进入安装流程。
+- ✅ 修复 Base64 导入体验：`clash-meta-import-block.txt` 改为节点 provider YAML 的 Base64，完整双轨 YAML 继续保存为 `clash-meta-config.yaml`，完整 YAML Base64 保存为 `clash-meta-subscription.txt`。
+- ✅ 新增 `clash-meta-proxies.yaml`、`ss-backup-uri.txt`、`ss-backup-uri-base64.txt` 和 `show-ghost-nodes`，普通节点导入至少可解析备轨 SS URI；主轨 AWG+SS 链式节点仍需 Mihomo 完整 YAML。
+- ✅ `verify_installation.sh` 增加 Base64 节点内容检查和备轨 SS URI 格式检查。
+- ✅ 实机修复：发现两台落地机旧节点仍指向 `61820/18389`，与中转机实际 `51820/8389`、`51821/8390` 映射不一致；用 v6.64 非交互重跑后元数据和 YAML 已纠正。
+- ✅ Mihomo v1.19.24 实机测试：x86 与 ARM 交叉运行对方完整 YAML，`mihomo -t` 均通过；主轨 `主轨-UDP极速` 与备轨 `备轨-TCP稳定` 访问 `https://cp.cloudflare.com/generate_204` 均返回 204。
+- ✅ 已安装重跑菜单测试：交互选择“显示已生成节点和 Base64”可正常展示端口、节点 Base64、备轨 SS URI 和完整 YAML 路径。
+
 # v6.63 版本 (2026-05-20)
 
 - ✅ 新增 `install_landing_v6.63.sh`、`install_transit_v6.63.sh`、`install_amneziawg_dkms_v6.63.sh`，并同步稳定入口到 v6.63。
