@@ -149,6 +149,15 @@ verify_landing() {
         fail "Sub-Store provider-only YAML 缺失: /etc/landing-ghost/substore-provider-only.yaml"
     fi
 
+    if [[ -s /etc/landing-ghost/substore-import-guide.txt ]] \
+        && grep -Fq "substore-provider-only.yaml" /etc/landing-ghost/substore-import-guide.txt \
+        && grep -Fq "mihomo-static-awg-proxy.yaml" /etc/landing-ghost/substore-import-guide.txt \
+        && grep -Fq "exclude-filter: '^AWG-Tunnel$'" /etc/landing-ghost/substore-import-guide.txt; then
+        ok "Sub-Store / ClashMeta 导入指南完整"
+    else
+        fail "Sub-Store / ClashMeta 导入指南缺失或关键提示不完整"
+    fi
+
     if [[ -s /etc/landing-ghost/substore-mihomo-full.yaml ]]; then
         local substore_full_ok=1
         for yaml_key in AWG-Tunnel amnezia-wg-option dialer-proxy proxy-groups rules 主轨-UDP极速 备轨-TCP稳定; do

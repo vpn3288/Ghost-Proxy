@@ -39,11 +39,19 @@ jobs:
             -w /work \
             debian:12 bash -lc '
               set -euo pipefail
-              apt-get update -qq
-              DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-                ca-certificates git build-essential golang-go pkg-config libmnl-dev make tar
-
               . ./versions.conf
+              apt-get update -qq
+              base_packages=(ca-certificates git build-essential make tar)
+              if ! DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+                "${base_packages[@]}" \
+                "golang-go=${GOLANG_VERSION}" \
+                "pkg-config=${PKG_CONFIG_VERSION}" \
+                "libmnl-dev=${LIBMNL_DEV_VERSION}"; then
+                echo "Pinned build dependencies unavailable; falling back to Debian 12 defaults" >&2
+                DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+                  "${base_packages[@]}" golang-go pkg-config libmnl-dev
+              fi
+
               tmp_dir="$(mktemp -d)"
               trap "rm -rf ${tmp_dir}" EXIT
 

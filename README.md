@@ -6,19 +6,19 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.80`
+当前稳定版本：`v6.83`
 
 仓库保留稳定入口和最新审查版本快照。旧版本通过 Git 历史回溯，默认使用无版本后缀的稳定入口。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.80
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.80
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.80
-install_transit_v6.80.sh        # v6.80 中转机版本快照
-install_landing_v6.80.sh        # v6.80 落地机版本快照
-install_amneziawg_dkms_v6.80.sh # v6.80 DKMS 版本快照
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.83
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.83
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.83
+install_transit_v6.83.sh        # v6.83 中转机版本快照
+install_landing_v6.83.sh        # v6.83 落地机版本快照
+install_amneziawg_dkms_v6.83.sh # v6.83 DKMS 版本快照
 dd_debian.sh                    # Debian 12.14 DD 辅助命令生成器，默认不执行
 verify_installation.sh          # 安装后验证脚本
 versions.conf                   # 依赖和上游源码 ref 固定配置
@@ -42,7 +42,7 @@ BIN456789_REINSTALL_SHA256='<上一步得到的sha256>' \
 ARM64：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh | sha256sum
+curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh | sha256sum
 LEITBOGIORO_REINSTALL_SHA256='<上一步得到的sha256>' \
   bash dd_debian.sh --arch arm64 --port 22 --execute
 ```
@@ -91,19 +91,46 @@ bash <(curl -fsSL https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/ins
 
 ## Sub-Store / Mihomo
 
-落地机安装完成后，普通用户优先使用：
+落地机安装完成后，入口分三类，不要混用：
+
+1. Mihomo 直导：复制完整 Base64，一键导入完整 Profile。
+
+```bash
+cat /etc/landing-ghost/clash-meta-subscription.txt
+```
+
+2. Sub-Store 节点 Provider：推荐使用 provider-only 分离法。先在 ClashMeta/Mihomo 基础配置静态注入 `AWG-Tunnel`，再让 Sub-Store 只输出主轨/备轨。
+
+```bash
+cat /etc/landing-ghost/mihomo-static-awg-proxy.yaml
+cat /etc/landing-ghost/substore-provider-only.yaml
+cat /etc/landing-ghost/substore-import-guide.txt
+```
+
+ClashMeta 订阅侧引用 Sub-Store 输出链接时，建议隐藏底层隧道并只选择可见节点：
+
+```yaml
+proxy-providers:
+  ghost:
+    type: http
+    url: "你的 Sub-Store 输出链接"
+    path: ./providers/ghost.yaml
+    exclude-filter: '^AWG-Tunnel$'
+
+proxy-groups:
+  - name: 自动切换
+    type: fallback
+    use: [ghost]
+    filter: '^(主轨-UDP极速|备轨-TCP稳定)$'
+```
+
+3. 自洽 Provider：只在确认 Sub-Store/客户端保留 `hidden` 和 `dialer-proxy` 字段时使用。
 
 ```bash
 cat /etc/landing-ghost/substore-awg-for-mihomo.yaml
 ```
 
-该文件是自洽的 Clash Proxies YAML Provider，包含隐藏的 `AWG-Tunnel`、主轨和备轨。Mihomo 节点列表应只选择 `主轨-UDP极速` 和 `备轨-TCP稳定`，底层 `AWG-Tunnel` 只负责 `dialer-proxy`。
-
-高级基础配置已静态注入 `AWG-Tunnel` 时，才使用：
-
-```bash
-cat /etc/landing-ghost/substore-provider-only.yaml
-```
+`substore-mihomo-full.yaml` 是完整 Mihomo Profile，可用于直导或完整模板，不要当作 Sub-Store 节点 Provider。
 
 ## 版本固定（可选）
 
@@ -116,7 +143,7 @@ curl -O https://raw.githubusercontent.com/vpn3288/Ghost-Proxy/main/versions.conf
 bash install_landing.sh
 ```
 
-可固定字段：`DKMS_VERSION`、`GCC_VERSION`、`SINGBOX_VERSION`、`AWG_DKMS_REF`、`AWG_TOOLS_REF`、`AWG_GO_REF`。留空表示使用系统仓库或上游默认版本。
+可固定字段：`DKMS_VERSION`、`GCC_VERSION`、`GOLANG_VERSION`、`PKG_CONFIG_VERSION`、`LIBMNL_DEV_VERSION`、`SINGBOX_VERSION`、`AWG_DKMS_REF`、`AWG_TOOLS_REF`、`AWG_GO_REF`。留空表示使用系统仓库或上游默认版本。
 
 可选预编译用户态兜底字段：`PREBUILT_AWG_GO_URL_x86_64`、`PREBUILT_AWG_GO_SHA256_x86_64`、`PREBUILT_AWG_TOOLS_URL_x86_64`、`PREBUILT_AWG_TOOLS_SHA256_x86_64`、`PREBUILT_AWG_GO_URL_arm64`、`PREBUILT_AWG_GO_SHA256_arm64`、`PREBUILT_AWG_TOOLS_URL_arm64`、`PREBUILT_AWG_TOOLS_SHA256_arm64`。未发布 Release 资产前保持留空，脚本会自动回退源码编译。
 

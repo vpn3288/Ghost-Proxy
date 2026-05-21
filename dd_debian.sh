@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.82"
+VERSION="6.83"
 
 usage() {
     cat <<EOF
@@ -143,6 +143,12 @@ DD 完成后验证:
   ssh -p ${SSH_PORT} root@<服务器IP>
   cat /etc/debian_version
   uname -r
+  apt-get update
+  apt-get install -y linux-headers-\$(uname -r) dkms gcc-12
+
+说明:
+  若 cat /etc/debian_version 不是 12.14，先不要继续安装落地机。
+  请确认 apt 源可用并补齐 headers/dkms/gcc-12 后，再运行 Ghost-Proxy 脚本。
 EOF
 
 if [[ "${EXECUTE}" != "1" ]]; then

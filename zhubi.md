@@ -1,5 +1,16 @@
 # Ghost-Proxy 审核记录
 
+# v6.83 版本 (2026-05-21)
+
+- ✅ 修复 P1：拆清 Mihomo 直导、Sub-Store 节点 Provider、完整 Profile 三类入口；默认提示改为 Base64 直导 + `substore-provider-only.yaml`，避免把 `substore-mihomo-full.yaml` 当 Provider。
+- ✅ 修复 P1：落地机新增 `/etc/landing-ghost/substore-import-guide.txt`，给出静态注入 `AWG-Tunnel`、Sub-Store provider-only、ClashMeta `exclude-filter`/`filter` 示例；`verify_installation.sh` 增加导入指南完整性检查。
+- ✅ 修复 P1：`.github/workflows/build-awg.yml` 读取 `GOLANG_VERSION`、`PKG_CONFIG_VERSION`、`LIBMNL_DEV_VERSION`，固定依赖不可用时再回退 Debian 12 默认包。
+- ✅ 修复 P1/P2：README 同步 v6.83，修正 ARM64 DD URL；`dd_debian.sh` 输出 DD 后强制核验 Debian 12.14 和补齐 `headers/dkms/gcc-12` 命令。
+- ✅ 改进 P1：中转机重复落地机 IP 且端口映射不同的错误提示展示当前映射/新映射，继续默认拒绝覆盖，避免已导入节点失效。
+- ⚖️ 评判：预编译 URL/SHA256 继续留空，原因是尚无已发布 Release 资产；本轮只修 workflow 的可复现构建条件，发布 tag 后再回填真实 SHA256。
+- ✅ 新增 `install_landing_v6.83.sh`、`install_transit_v6.83.sh`、`install_amneziawg_dkms_v6.83.sh`，稳定入口同步到 v6.83。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.83.sh`、`install_transit_v6.83.sh`、`install_amneziawg_dkms_v6.83.sh` 均通过；`dd_debian.sh --arch amd64/arm64` 纯打印模式通过。
+
 # v6.82 版本 (2026-05-21)
 
 - ✅ 修复 P1：`dd_debian.sh` 的 amd64 参数改为上游支持的 `debian 12`，ARM64 改用可访问的 `Linux_reinstall/InstallNET.sh` 与 `-Debian/-pwd/-port` 参数；继续提示 DD 后核验 `/etc/debian_version`。
