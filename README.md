@@ -6,19 +6,19 @@ Ghost-Proxy 是一套 Debian 12 双机链式代理安装脚本：
 - `install_landing.sh`：落地机，部署 AmneziaWG + Shadowsocks-2022 双轨节点。
 - `install_amneziawg_dkms.sh`：独立 DKMS 安装 AmneziaWG 内核模块，可单独调用，也可由落地机脚本自动调用。
 
-当前稳定版本：`v6.78`
+当前稳定版本：`v6.79`
 
 仓库保留稳定入口和最新审查版本快照。旧版本通过 Git 历史回溯，默认使用无版本后缀的稳定入口。
 
 ## 项目结构
 
 ```text
-install_transit.sh              # 中转机稳定入口，当前同步到 v6.78
-install_landing.sh              # 落地机稳定入口，当前同步到 v6.78
-install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.78
-install_transit_v6.78.sh        # v6.78 中转机版本快照
-install_landing_v6.78.sh        # v6.78 落地机版本快照
-install_amneziawg_dkms_v6.78.sh # v6.78 DKMS 版本快照
+install_transit.sh              # 中转机稳定入口，当前同步到 v6.79
+install_landing.sh              # 落地机稳定入口，当前同步到 v6.79
+install_amneziawg_dkms.sh       # AmneziaWG DKMS 独立入口，当前同步到 v6.79
+install_transit_v6.79.sh        # v6.79 中转机版本快照
+install_landing_v6.79.sh        # v6.79 落地机版本快照
+install_amneziawg_dkms_v6.79.sh # v6.79 DKMS 版本快照
 dd_debian.sh                    # Debian 12.14 DD 辅助命令生成器，默认不执行
 verify_installation.sh          # 安装后验证脚本
 versions.conf                   # 依赖和上游源码 ref 固定配置
@@ -30,23 +30,21 @@ docs/alternative-solutions.md   # 备用方案评判
 
 推荐使用 Debian 12 Bookworm minimal（当前稳定点版本 12.14）作为中转机和落地机基线。脚本不会自动 DD 或清盘，下面命令仅作为新机重装参考，执行前必须确认 VPS 商救援方式和 SSH 端口：
 
+先获取上游 DD 脚本 SHA256，再使用仓库内辅助脚本执行。未设置 SHA256 时，`dd_debian.sh` 只打印下载和校验命令，不会执行清盘：
+
 ```bash
-curl -O https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh
-bash reinstall.sh debian 12.14 --ssh-port 22
+# x86_64 / amd64
+curl -fsSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh | sha256sum
+BIN456789_REINSTALL_SHA256='<上一步得到的sha256>' \
+  bash dd_debian.sh --password 'your-ssh-password' --arch amd64 --port 22 --execute
 ```
 
-x86_64 备用 DD 脚本示例（MoeClub）：
+ARM64：
 
 ```bash
-bash <(wget --no-check-certificate -qO- 'https://raw.githubusercontent.com/MoeClub/Note/master/InstallNET.sh') \
-  -d 12 -v 64 -a -p 'your-ssh-password'
-```
-
-ARM64 备用 DD 脚本示例（leitbogioro）：
-
-```bash
-bash <(wget --no-check-certificate -qO- 'https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh') \
-  Debian 12
+curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh | sha256sum
+LEITBOGIORO_REINSTALL_SHA256='<上一步得到的sha256>' \
+  bash dd_debian.sh --password 'your-ssh-password' --arch arm64 --port 22 --execute
 ```
 
 也可以使用仓库内辅助脚本生成命令。默认只打印，不会执行清盘：

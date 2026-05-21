@@ -1,5 +1,18 @@
 # Ghost-Proxy 审核记录
 
+# v6.79 版本 (2026-05-21)
+
+- ✅ 修复 P0：恢复本地 Base64 导入文件，重新生成 `clash-meta-subscription.txt`（完整 Clash Meta YAML Base64）、`clash-meta-import-block.txt`（Mihomo Profile Base64）和 `ss-backup-uri-base64.txt`，安装完成与 `show-ghost-nodes` 默认提示 Base64 查看命令。
+- ✅ 修复 P1：落地机 Ghost 端口改用 `GHOST_LANDING_INPUT` 专属链并插入 INPUT 前部，避免既有宽泛 ACCEPT 规则压过 AWG/SS 端口限制，同时保留 Docker/1Panel 兼容。
+- ✅ 修复 P1：中转机 `LANDING_LIST` 非交互重跑时，相同 IP 与端口映射完全一致视为 no-op；映射不同仍拒绝，需显式 `UPSERT_LANDING=1` 才更新。
+- ✅ 修复 P1：中转机健康检查首次随机延迟由 60-180 秒缩短为 30-90 秒。
+- ✅ 修复 P1：`dd_debian.sh` 更新到 v6.79，补充 SHA256 获取与 `--execute` 环境变量示例；未设置 SHA 时只打印下载和校验命令，不拼接执行清盘命令。
+- ✅ README 同步 v6.79，并把 DD 示例改为先获取 SHA256 再执行 `dd_debian.sh --execute`。
+- ✅ 新增 `install_landing_v6.79.sh`、`install_transit_v6.79.sh`、`install_amneziawg_dkms_v6.79.sh`，稳定入口同步到 v6.79。
+- ✅ 增强 Debian 12.14 提示：落地机和 DKMS 脚本读取 `RECOMMENDED_OS_POINT`，非 Debian 12 需要输入 `yes` 才继续，12.x 非 12.14 只警告不阻断。
+- ✅ `verify_installation.sh landing` 增加 Base64 解码检查，确认 `AWG-Tunnel`、`amnezia-wg-option`、`dialer-proxy`、`主轨-UDP极速`、`备轨-TCP稳定` 存在。
+- ⚠️ 预编译 `amneziawg-go` / `awg-tools` 备用轨暂不填写 `versions.conf` URL 和 SHA256：当前未发布对应 GitHub Release 资产，不能伪造校验值；发布 tag 后再补真实地址和 SHA256。
+
 # v6.78 版本 (2026-05-21)
 
 - ✅ 根据实测反馈，用户导入入口收敛为唯一可用的完整配置：`/etc/landing-ghost/clash-meta-config.yaml`。

@@ -154,6 +154,13 @@ verify_landing() {
         warn "备轨 SS URI 节点缺失或格式异常"
     fi
 
+    if [[ -s /etc/landing-ghost/ss-backup-uri-base64.txt ]] \
+        && base64 -d /etc/landing-ghost/ss-backup-uri-base64.txt 2>/dev/null | grep -Eq '^ss://.+@.+:[0-9]+#Ghost-Backup-TCP$'; then
+        ok "备轨 SS URI Base64 可解码"
+    else
+        warn "备轨 SS URI Base64 缺失或格式异常"
+    fi
+
     if [[ -s /etc/landing-ghost/clash-meta-config.yaml ]]; then
         local yaml_key yaml_ok=1
         for yaml_key in amnezia-wg-option allowed-ips dialer-proxy; do
@@ -165,6 +172,44 @@ verify_landing() {
         [[ "${yaml_ok}" -eq 0 ]] || ok "Mihomo YAML 关键字段完整"
     else
         fail "Mihomo YAML 配置缺失: /etc/landing-ghost/clash-meta-config.yaml"
+    fi
+
+    if [[ -s /etc/landing-ghost/clash-meta-subscription.txt ]]; then
+        local decoded decoded_ok=1
+        decoded=$(mktemp)
+        if base64 -d /etc/landing-ghost/clash-meta-subscription.txt > "${decoded}" 2>/dev/null; then
+            for yaml_key in AWG-Tunnel amnezia-wg-option dialer-proxy 主轨-UDP极速 备轨-TCP稳定; do
+                if ! grep -Fq "${yaml_key}" "${decoded}"; then
+                    fail "完整 YAML Base64 解码后缺少: ${yaml_key}"
+                    decoded_ok=0
+                fi
+            done
+            [[ "${decoded_ok}" -eq 0 ]] || ok "完整 YAML Base64 可解码且关键字段完整"
+        else
+            fail "完整 YAML Base64 解码失败: /etc/landing-ghost/clash-meta-subscription.txt"
+        fi
+        rm -f "${decoded}"
+    else
+        fail "完整 YAML Base64 缺失: /etc/landing-ghost/clash-meta-subscription.txt"
+    fi
+
+    if [[ -s /etc/landing-ghost/clash-meta-import-block.txt ]]; then
+        local profile_decoded profile_decoded_ok=1
+        profile_decoded=$(mktemp)
+        if base64 -d /etc/landing-ghost/clash-meta-import-block.txt > "${profile_decoded}" 2>/dev/null; then
+            for yaml_key in AWG-Tunnel amnezia-wg-option dialer-proxy 主轨-UDP极速 备轨-TCP稳定; do
+                if ! grep -Fq "${yaml_key}" "${profile_decoded}"; then
+                    fail "Mihomo Profile Base64 解码后缺少: ${yaml_key}"
+                    profile_decoded_ok=0
+                fi
+            done
+            [[ "${profile_decoded_ok}" -eq 0 ]] || ok "Mihomo Profile Base64 可解码且关键字段完整"
+        else
+            fail "Mihomo Profile Base64 解码失败: /etc/landing-ghost/clash-meta-import-block.txt"
+        fi
+        rm -f "${profile_decoded}"
+    else
+        fail "Mihomo Profile Base64 缺失: /etc/landing-ghost/clash-meta-import-block.txt"
     fi
 
     if [[ -s /etc/landing-ghost/mihomo-profile.yaml ]]; then

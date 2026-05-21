@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.61"
+VERSION="6.79"
 
 usage() {
     cat <<EOF
@@ -11,6 +11,18 @@ usage() {
   默认只打印推荐 DD 命令，不会清盘。
   加 --execute 后会二次确认并在 10 秒倒计时后执行；执行前必须提供对应脚本 SHA256。
   DD/网络重装会清空服务器，仅限新机或已确认救援能力的机器。
+
+环境变量（--execute 模式必需）:
+  BIN456789_REINSTALL_SHA256=<sha256>    # amd64 使用
+  LEITBOGIORO_REINSTALL_SHA256=<sha256>  # arm64 使用
+
+获取当前上游脚本 SHA256:
+  amd64: curl -fsSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh | sha256sum
+  arm64: curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh | sha256sum
+
+安全执行示例:
+  BIN456789_REINSTALL_SHA256=<sha256> bash dd_debian.sh --password 'your-password' --arch amd64 --execute
+  LEITBOGIORO_REINSTALL_SHA256=<sha256> bash dd_debian.sh --password 'your-password' --arch arm64 --execute
 EOF
 }
 
@@ -67,14 +79,14 @@ case "${ARCH}" in
         SCRIPT_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
         SCRIPT_SHA256="${BIN456789_REINSTALL_SHA256:-}"
         SCRIPT_ARGS=(debian 12.14 --password "${SSH_PASSWORD}" --ssh-port "${SSH_PORT}")
-        DD_CMD="curl -fsSLO ${SCRIPT_URL} && sha256sum reinstall.sh && bash reinstall.sh debian 12.14 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+        DD_CMD="curl -fsSLO ${SCRIPT_URL} && sha256sum reinstall.sh"
         ;;
     aarch64|arm64)
         ARCH="arm64"
         SCRIPT_URL="https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh"
         SCRIPT_SHA256="${LEITBOGIORO_REINSTALL_SHA256:-}"
         SCRIPT_ARGS=(Debian 12 --password "${SSH_PASSWORD}" --ssh-port "${SSH_PORT}")
-        DD_CMD="curl -fsSL '${SCRIPT_URL}' -o reinstall.sh && sha256sum reinstall.sh && bash reinstall.sh Debian 12 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+        DD_CMD="curl -fsSL '${SCRIPT_URL}' -o reinstall.sh && sha256sum reinstall.sh"
         ;;
     *)
         echo "当前架构: ${ARCH}" >&2
@@ -109,6 +121,12 @@ Ghost-Proxy DD 辅助脚本 v${VERSION}
 建议在新的 SSH 会话中执行以下命令，避免当前会话断开后无法观察输出:
 
 ${DD_CMD}
+
+$(if [[ -z "${SCRIPT_SHA256}" ]]; then cat <<'NOSHA'
+当前未设置对应 SHA256 环境变量，上面的命令只下载并显示校验值，不会直接执行清盘脚本。
+确认 SHA256 后再按 usage 示例设置环境变量并追加 --execute。
+NOSHA
+fi)
 
 DD 完成后验证:
   ssh -p ${SSH_PORT} root@<服务器IP>
