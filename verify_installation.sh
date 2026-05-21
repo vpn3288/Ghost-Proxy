@@ -66,6 +66,98 @@ validate_mihomo_profile_file() {
     return 1
 }
 
+validate_substore_provider_combo() {
+    local static_awg="/etc/landing-ghost/mihomo-static-awg-proxy.yaml"
+    local provider="/etc/landing-ghost/substore-provider-only.yaml"
+    local base="/etc/landing-ghost/clash-meta-substore-base.yaml"
+    local tmp_config combo_ok=1
+
+    for file in "${static_awg}" "${provider}" "${base}"; do
+        if [[ ! -s "${file}" ]]; then
+            fail "Sub-Store provider-only 组合校验缺少文件: ${file}"
+            return 1
+        fi
+    done
+
+    for yaml_key in proxy-providers ghost "https://example.invalid/replace-with-substore-output.yaml" "exclude-filter: '^AWG-Tunnel$'" "filter: '^(主轨-UDP极速|备轨-TCP稳定)$'"; do
+        if ! grep -Fq "${yaml_key}" "${base}"; then
+            fail "ClashMeta Sub-Store 基础模板缺少: ${yaml_key}"
+            combo_ok=0
+        fi
+    done
+
+    tmp_config=$(mktemp)
+    cat > "${tmp_config}" <<'YAML'
+port: 7890
+socks-port: 7891
+mixed-port: 7892
+allow-lan: false
+bind-address: '*'
+mode: rule
+log-level: info
+ipv6: false
+YAML
+    cat "${static_awg}" >> "${tmp_config}"
+    cat >> "${tmp_config}" <<YAML
+
+proxy-providers:
+  ghost:
+    type: file
+    path: ${provider}
+    health-check:
+      enable: true
+      url: https://cp.cloudflare.com/generate_204
+      interval: 300
+
+proxy-groups:
+  - name: "自动切换"
+    type: fallback
+    use:
+      - ghost
+    filter: '^(主轨-UDP极速|备轨-TCP稳定)$'
+    exclude-filter: '^AWG-Tunnel$'
+    url: https://cp.cloudflare.com/generate_204
+    interval: 300
+    tolerance: 50
+
+  - name: "手动选择"
+    type: select
+    proxies:
+      - "自动切换"
+      - DIRECT
+    use:
+      - ghost
+    filter: '^(主轨-UDP极速|备轨-TCP稳定)$'
+    exclude-filter: '^AWG-Tunnel$'
+
+rules:
+  - MATCH,自动切换
+YAML
+
+    if awk '/^proxy-groups:/,/^rules:/' "${tmp_config}" | grep -Eq '^[[:space:]]*-[[:space:]]*"AWG-Tunnel"'; then
+        fail "Sub-Store provider-only 组合策略组不应直接展示 AWG-Tunnel"
+        combo_ok=0
+    fi
+
+    if command -v mihomo >/dev/null 2>&1; then
+        if mihomo -t -f "${tmp_config}" >/dev/null 2>&1; then
+            ok "mihomo 可解析静态 AWG + provider-only 组合配置"
+        else
+            fail "mihomo 无法解析静态 AWG + provider-only 组合配置"
+            combo_ok=0
+        fi
+    else
+        warn "未安装 mihomo，跳过静态 AWG + provider-only 真实解析测试"
+    fi
+
+    rm -f "${tmp_config}"
+    if [[ "${combo_ok}" -eq 1 ]]; then
+        ok "Sub-Store provider-only 组合配置完整"
+        return 0
+    fi
+    return 1
+}
+
 check_service() {
     local service="$1"
     if systemctl is-active --quiet "${service}" 2>/dev/null; then
@@ -199,9 +291,12 @@ verify_landing() {
         fail "Sub-Store provider-only YAML 缺失: /etc/landing-ghost/substore-provider-only.yaml"
     fi
 
+    validate_substore_provider_combo || true
+
     if [[ -s /etc/landing-ghost/substore-import-guide.txt ]] \
         && grep -Fq "clash-meta-config.yaml" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "substore-provider-only.yaml" /etc/landing-ghost/substore-import-guide.txt \
+        && grep -Fq "clash-meta-substore-base.yaml" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "mihomo-static-awg-proxy.yaml" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "exclude-filter: '^AWG-Tunnel$'" /etc/landing-ghost/substore-import-guide.txt \
         && grep -Fq "输出格式必须保持 Clash" /etc/landing-ghost/substore-import-guide.txt \
@@ -249,7 +344,7 @@ verify_landing() {
         fi
         [[ "${import_ok}" -eq 0 ]] || ok "Sub-Store 逐行 JSON 完整"
     else
-        fail "Sub-Store 逐行 JSON 缺失: /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt"
+        warn "Sub-Store 逐行 JSON 已作为旧入口移除；推荐 raw YAML provider-only"
     fi
 
     if [[ -s /etc/landing-ghost/substore-copy.txt ]] \
@@ -316,7 +411,7 @@ verify_landing() {
         fi
         rm -f "${profile_decoded}"
     else
-        fail "Mihomo Profile Base64 缺失: /etc/landing-ghost/clash-meta-import-block.txt"
+        warn "Mihomo Profile 片段 Base64 已作为旧入口移除；完整 Base64 使用 clash-meta-subscription.txt"
     fi
 
     if [[ -s /etc/landing-ghost/mihomo-profile.yaml ]]; then
@@ -330,6 +425,12 @@ verify_landing() {
         [[ "${profile_ok}" -eq 0 ]] || ok "Mihomo Profile 关键字段完整"
     else
         fail "Mihomo Profile 缺失: /etc/landing-ghost/mihomo-profile.yaml"
+    fi
+
+    if [[ -s /etc/landing-ghost/.awg_backend ]] && grep -Eq '^(kernel|go)$' /etc/landing-ghost/.awg_backend; then
+        ok "AWG 后端状态文件: $(cat /etc/landing-ghost/.awg_backend)"
+    else
+        warn "AWG 后端状态文件缺失或异常: /etc/landing-ghost/.awg_backend"
     fi
 
     if systemctl show awg-landing.service -p Environment 2>/dev/null | grep -q "amneziawg-go"; then

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.87"
+VERSION="6.89"
 
 usage() {
     cat <<EOF
@@ -19,6 +19,10 @@ usage() {
 获取当前上游脚本 SHA256:
   amd64: curl -fsSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh | sha256sum
   arm64: curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh | sha256sum
+
+注意:
+  当前 DD 命令只固定 Debian 12，不保证固定到 12.14。
+  DD 后必须执行 cat /etc/debian_version && uname -r，再决定是否继续安装。
 
 安全执行示例:
   BIN456789_REINSTALL_SHA256=<sha256> bash dd_debian.sh --arch amd64 --execute
@@ -123,8 +127,8 @@ cat <<EOF
 Ghost-Proxy DD 辅助脚本 v${VERSION}
 
 推荐系统基线:
-  Debian 12.14 Bookworm minimal
-  DD 参数统一使用 Debian 12；DD 后用 cat /etc/debian_version 确认小版本，必要时 apt update && apt full-upgrade。
+  Debian 12 Bookworm minimal（12.14 是 Ghost-Proxy 已验证排障基线）
+  DD 参数统一使用 Debian 12；上游脚本/镜像决定实际点版本，不保证固定到 12.14。
 
 目标架构:
   ${ARCH}
@@ -147,7 +151,8 @@ DD 完成后验证:
   apt-get install -y linux-headers-\$(uname -r) dkms gcc-12
 
 说明:
-  若 cat /etc/debian_version 不是 12.14，先不要继续安装落地机。
+  该 DD 命令只固定 Debian 12，不保证固定到 12.14。
+  若 cat /etc/debian_version 不是 12.14，仍可测试；如遇 DKMS 问题，请先记录 cat /etc/debian_version 和 uname -r。
   请确认 apt 源可用并补齐 headers/dkms/gcc-12 后，再运行 Ghost-Proxy 脚本。
 EOF
 

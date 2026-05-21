@@ -1,5 +1,19 @@
 # Ghost-Proxy 审核记录
 
+# v6.89 版本 (2026-05-22)
+
+- ✅ 修复 P1：DD 基线文案改为“Debian 12 Bookworm 当前点版本 / 12.14 为已验证排障基线”，明确当前 DD 命令只固定 Debian 12，不保证固定到 12.14；DD 后必须记录 `cat /etc/debian_version && uname -r`。
+- ✅ 修复 P1：落地机新增 `clash-meta-substore-base.yaml`，静态注入 `AWG-Tunnel`，用户只需把 `proxy-providers.ghost.url` 改为 Sub-Store 输出链接；默认提示和 README 同步该入口。
+- ✅ 修复 P1：`verify_installation.sh` 新增“静态 AWG + provider-only”临时组合配置，检测到 `mihomo` 时真实解析，确认策略组只展示主轨/备轨。
+- ✅ 修复 P1：落地机写入 `/etc/landing-ghost/.awg_backend`；`landing-health-check` 优先读该文件；DKMS 健康检查检测到 `amneziawg-go` 后端时直接跳过，避免误触发 DKMS 重编译。
+- ✅ 修复 P1：停止生成旧入口 `clash-meta-import-block.txt`、`substore-awg-for-mihomo-base64.txt`、`substore-awg-for-mihomo-jsonlines.txt`、`substore-mihomo-full-base64.txt`，保留完整 Base64 备用入口 `clash-meta-subscription.txt`。
+- ⚖️ 驳回：中转机 `ensure_nft_main_conf()` 覆盖用户 `/etc/nftables.conf` 的意见不适用于当前主线；v6.88 已是“缺文件才创建，已有文件只追加 Ghost include 并备份”。
+- ⚖️ 驳回：仓库不存在审查报告所述 `Ghost-Proxy/` 旧版子目录；无需删除。
+- ⚖️ 继续拒绝：不把预编译 `.ko` 放进 git；`.ko` 绑定 kernel ABI/vermagic，跨 VPS 风险高。继续采用 Release 预编译 `amneziawg-go`/`awg-tools` + SHA256 的用户态回退路线。
+- ⚠️ 历史说明：下方旧版本记录中关于“标准 WireGuard 最后手段”的描述仅为已废弃历史，当前红线仍是禁止普通 WireGuard，DKMS 失败只允许回退支持混淆的 `amneziawg-go`。
+- ✅ 新增 `install_landing_v6.89.sh`、`install_transit_v6.89.sh`、`install_amneziawg_dkms_v6.89.sh`，并同步稳定入口。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.89.sh`、`install_transit_v6.89.sh`、`install_amneziawg_dkms_v6.89.sh`；`git diff --check` 通过。
+
 # v6.88 版本 (2026-05-21)
 
 - ✅ 修复 P0：默认导入入口改为 Mihomo raw YAML（`clash-meta-config.yaml`）与 Sub-Store raw provider-only（`substore-provider-only.yaml`）；Base64 仅标注为 Mihomo 完整 Profile 兼容备用，明确禁止粘贴到 Sub-Store。
