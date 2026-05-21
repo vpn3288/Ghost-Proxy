@@ -1,5 +1,15 @@
 # Ghost-Proxy 审核记录
 
+# v6.72 版本 (2026-05-21)
+
+- ✅ 拆分 Sub-Store 输出：`MIHOMO_STATIC_AWG_PROXY` 只放底层 `AWG-Tunnel`，`SUBSTORE_PROVIDER_YAML/JSON` 只放用户可见的主轨/备轨节点。
+- ✅ `AWG-Tunnel` 增加 `hidden: true`，完整 Mihomo Profile 仍保留主轨 `dialer-proxy` 能力。
+- ✅ `verify_installation.sh` 改为校验静态 AWG 隧道与 Sub-Store 可见节点分离，防止 `AWG-Tunnel` 混入 Provider 节点。
+- ✅ 同步修改 `vpn3288/mihomo` 配置脚本：新增 `GHOST_STATIC_PROXIES` 与 provider `exclude-filter`，避免 GLOBAL/浏览器组显示 `AWG-Tunnel/DIRECT/REJECT`。
+- ✅ 实机重建 ARM 落地机节点后验证：Sub-Store Provider 只含 `主轨-UDP极速`、`备轨-TCP稳定`，静态 AWG 文件只含 `AWG-Tunnel`。
+- ✅ 本机 Mihomo 以“静态 AWG + 可见 Provider”方式实测：`自动切换` 组 API 只返回主轨/备轨，主轨访问 Cloudflare 204 成功。
+- ✅ 新增 `install_landing_v6.72.sh`、`install_transit_v6.72.sh`、`install_amneziawg_dkms_v6.72.sh`，并清理 v6.71 快照。
+
 # v6.71 版本 (2026-05-21)
 
 - ✅ 修复多落地机场景：落地机重跑时优先复用 `metadata.json` 中的中转监听端口，避免 ARM/x86 节点都回落到 `61820/18389`。

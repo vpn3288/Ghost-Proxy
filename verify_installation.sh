@@ -60,27 +60,48 @@ verify_landing() {
         fail "AWG 配置文件缺失: ${awg_conf}"
     fi
 
+    if [[ -s /etc/landing-ghost/mihomo-static-awg-proxy.yaml ]]; then
+        local static_awg_ok=1
+        for yaml_key in AWG-Tunnel wireguard amnezia-wg-option allowed-ips hidden; do
+            if ! grep -Fq "${yaml_key}" /etc/landing-ghost/mihomo-static-awg-proxy.yaml; then
+                fail "Mihomo 静态 AWG 隧道缺少: ${yaml_key}"
+                static_awg_ok=0
+            fi
+        done
+        [[ "${static_awg_ok}" -eq 0 ]] || ok "Mihomo 静态 AWG 隧道完整"
+    else
+        fail "Mihomo 静态 AWG 隧道缺失: /etc/landing-ghost/mihomo-static-awg-proxy.yaml"
+    fi
+
     if [[ -s /etc/landing-ghost/substore-awg-for-mihomo.yaml ]]; then
         local substore_yaml_ok=1
-        for yaml_key in AWG-Tunnel 主轨-UDP极速 备轨-TCP稳定 amnezia-wg-option allowed-ips dialer-proxy; do
+        for yaml_key in 主轨-UDP极速 备轨-TCP稳定 dialer-proxy; do
             if ! grep -Fq "${yaml_key}" /etc/landing-ghost/substore-awg-for-mihomo.yaml; then
-                fail "Sub-Store YAML 缺少: ${yaml_key}"
+                fail "Sub-Store 可见节点 YAML 缺少: ${yaml_key}"
                 substore_yaml_ok=0
             fi
         done
-        [[ "${substore_yaml_ok}" -eq 0 ]] || ok "Sub-Store Clash Proxies YAML 完整"
+        if grep -Fq 'name: "AWG-Tunnel"' /etc/landing-ghost/substore-awg-for-mihomo.yaml; then
+            fail "Sub-Store 可见节点 YAML 不应包含 AWG-Tunnel"
+            substore_yaml_ok=0
+        fi
+        [[ "${substore_yaml_ok}" -eq 0 ]] || ok "Sub-Store 可见节点 YAML 完整"
     else
         fail "Sub-Store YAML 缺失: /etc/landing-ghost/substore-awg-for-mihomo.yaml"
     fi
 
     if [[ -s /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt ]]; then
         local import_key import_ok=1
-        for import_key in AWG-Tunnel 主轨-UDP极速 备轨-TCP稳定; do
+        for import_key in 主轨-UDP极速 备轨-TCP稳定; do
             if ! grep -Fq "\"name\":\"${import_key}\"" /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt; then
                 fail "Sub-Store 逐行 JSON 缺少: ${import_key}"
                 import_ok=0
             fi
         done
+        if grep -Fq '"name":"AWG-Tunnel"' /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt; then
+            fail "Sub-Store 逐行 JSON 不应包含 AWG-Tunnel"
+            import_ok=0
+        fi
         if ! while IFS= read -r line; do [[ -z "${line}" ]] || jq -e '.name and .type' >/dev/null <<< "${line}"; done < /etc/landing-ghost/substore-awg-for-mihomo-jsonlines.txt; then
             fail "Sub-Store 逐行 JSON 格式异常"
             import_ok=0
@@ -91,10 +112,12 @@ verify_landing() {
     fi
 
     if [[ -s /etc/landing-ghost/substore-copy.txt ]] \
-        && grep -Fq "===== SUBSTORE_YAML_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_YAML_END =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_JSON_START =====" /etc/landing-ghost/substore-copy.txt \
-        && grep -Fq "===== SUBSTORE_JSON_END =====" /etc/landing-ghost/substore-copy.txt; then
+        && grep -Fq "===== MIHOMO_STATIC_AWG_PROXY_START =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== MIHOMO_STATIC_AWG_PROXY_END =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== SUBSTORE_PROVIDER_YAML_START =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== SUBSTORE_PROVIDER_YAML_END =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== SUBSTORE_PROVIDER_JSON_START =====" /etc/landing-ghost/substore-copy.txt \
+        && grep -Fq "===== SUBSTORE_PROVIDER_JSON_END =====" /etc/landing-ghost/substore-copy.txt; then
         ok "Sub-Store 复制文件分割标志完整"
     else
         fail "Sub-Store 复制文件缺失或分割标志不完整"
