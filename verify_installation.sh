@@ -61,16 +61,20 @@ verify_landing() {
     fi
 
     if [[ -s /etc/landing-ghost/clash-meta-import-block.txt ]] \
-        && base64 -d /etc/landing-ghost/clash-meta-import-block.txt >/tmp/ghost-proxy-import-block.yaml 2>/dev/null; then
+        && base64 -d /etc/landing-ghost/clash-meta-import-block.txt >/tmp/ghost-proxy-import-block.txt 2>/dev/null; then
         ok "Base64 一键导入块存在且可解码"
         local import_key import_ok=1
-        for import_key in proxies AWG-Tunnel 主轨-UDP极速 备轨-TCP稳定; do
-            if ! grep -Fq "${import_key}" /tmp/ghost-proxy-import-block.yaml; then
-                fail "Base64 节点导入块缺少: ${import_key}"
+        for import_key in AWG-Tunnel 主轨-UDP极速 备轨-TCP稳定; do
+            if ! grep -Fq "\"name\":\"${import_key}\"" /tmp/ghost-proxy-import-block.txt; then
+                fail "Base64 Sub-Store 节点缺少: ${import_key}"
                 import_ok=0
             fi
         done
-        [[ "${import_ok}" -eq 0 ]] || ok "Base64 节点导入块包含 Mihomo 节点"
+        if ! while IFS= read -r line; do [[ -z "${line}" ]] || jq -e '.name and .type' >/dev/null <<< "${line}"; done < /tmp/ghost-proxy-import-block.txt; then
+            fail "Base64 Sub-Store 节点不是逐行 JSON"
+            import_ok=0
+        fi
+        [[ "${import_ok}" -eq 0 ]] || ok "Base64 Sub-Store 导入块包含双轨节点"
     else
         fail "Base64 一键导入块缺失或不可解码"
     fi

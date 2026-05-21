@@ -1,5 +1,13 @@
 # Ghost-Proxy 审核记录
 
+# v6.66 版本 (2026-05-21)
+
+- ✅ 新增 `install_landing_v6.66.sh`、`install_transit_v6.66.sh`、`install_amneziawg_dkms_v6.66.sh`，并同步稳定入口到 v6.66。
+- ✅ Base64 导入块改为 Sub-Store 友好的逐行 Mihomo 节点 JSON；解码后包含 `AWG-Tunnel`、`主轨-UDP极速`、`备轨-TCP稳定` 三个节点，主轨通过 `dialer-proxy` 依赖 AWG-Tunnel。
+- ✅ 落地机安装完成后终端直接打印 Sub-Store 双轨节点 Base64 和完整 Mihomo YAML，不再要求用户去目录里找。
+- ✅ `verify_installation.sh` 改为校验 Base64 解码后的逐行 JSON 节点内容。
+- ✅ 实机复测：x86 落地机重跑 v6.66 后安装输出包含 Base64 与完整 YAML；Base64 解码得到 3 个 JSON 节点；落地验证 0 警告；本机 Mihomo v1.19.24 对 v6.66 YAML 执行 `-t` 通过。
+
 # v6.65 版本 (2026-05-21)
 
 - ✅ 新增 `install_landing_v6.65.sh`、`install_transit_v6.65.sh`、`install_amneziawg_dkms_v6.65.sh`，并同步稳定入口到 v6.65。
