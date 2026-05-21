@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.81"
+VERSION="6.82"
 
 usage() {
     cat <<EOF
@@ -18,7 +18,7 @@ usage() {
 
 获取当前上游脚本 SHA256:
   amd64: curl -fsSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh | sha256sum
-  arm64: curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh | sha256sum
+  arm64: curl -fsSL https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh | sha256sum
 
 安全执行示例:
   BIN456789_REINSTALL_SHA256=<sha256> bash dd_debian.sh --arch amd64 --execute
@@ -89,15 +89,15 @@ case "${ARCH}" in
         ARCH="amd64"
         SCRIPT_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
         SCRIPT_SHA256="${BIN456789_REINSTALL_SHA256:-}"
-        SCRIPT_ARGS=(debian 12.14 --password "${SSH_PASSWORD}" --ssh-port "${SSH_PORT}")
+        SCRIPT_ARGS=(debian 12 --password "${SSH_PASSWORD}" --ssh-port "${SSH_PORT}")
         DD_CMD="curl -fsSLO ${SCRIPT_URL} && sha256sum reinstall.sh"
         ;;
     aarch64|arm64)
         ARCH="arm64"
-        SCRIPT_URL="https://raw.githubusercontent.com/leitbogioro/Tools/master/Reinstall/reinstall.sh"
+        SCRIPT_URL="https://raw.githubusercontent.com/leitbogioro/Tools/master/Linux_reinstall/InstallNET.sh"
         SCRIPT_SHA256="${LEITBOGIORO_REINSTALL_SHA256:-}"
-        SCRIPT_ARGS=(Debian 12 --password "${SSH_PASSWORD}" --ssh-port "${SSH_PORT}")
-        DD_CMD="curl -fsSL '${SCRIPT_URL}' -o reinstall.sh && sha256sum reinstall.sh"
+        SCRIPT_ARGS=(-Debian 12 -pwd "${SSH_PASSWORD}" -port "${SSH_PORT}")
+        DD_CMD="curl -fsSL '${SCRIPT_URL}' -o InstallNET.sh && sha256sum InstallNET.sh"
         ;;
     *)
         echo "当前架构: ${ARCH}" >&2
@@ -111,10 +111,10 @@ esac
 if [[ -n "${SCRIPT_SHA256}" ]]; then
     case "${ARCH}" in
         amd64)
-            DD_CMD="curl -fsSLO ${SCRIPT_URL} && printf '%s  %s\n' '${SCRIPT_SHA256}' reinstall.sh | sha256sum -c - && bash reinstall.sh debian 12.14 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+            DD_CMD="curl -fsSLO ${SCRIPT_URL} && printf '%s  %s\n' '${SCRIPT_SHA256}' reinstall.sh | sha256sum -c - && bash reinstall.sh debian 12 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
             ;;
         arm64)
-            DD_CMD="curl -fsSL '${SCRIPT_URL}' -o reinstall.sh && printf '%s  %s\n' '${SCRIPT_SHA256}' reinstall.sh | sha256sum -c - && bash reinstall.sh Debian 12 --password '${SSH_PASSWORD}' --ssh-port '${SSH_PORT}'"
+            DD_CMD="curl -fsSL '${SCRIPT_URL}' -o InstallNET.sh && printf '%s  %s\n' '${SCRIPT_SHA256}' InstallNET.sh | sha256sum -c - && bash InstallNET.sh -Debian 12 -pwd '${SSH_PASSWORD}' -port '${SSH_PORT}'"
             ;;
     esac
 fi
@@ -124,7 +124,7 @@ Ghost-Proxy DD 辅助脚本 v${VERSION}
 
 推荐系统基线:
   Debian 12.14 Bookworm minimal
-  amd64 使用 bin456789 参数 debian 12.14；arm64 上游脚本仅提供 Debian 12 参数，请 DD 后用 cat /etc/debian_version 确认小版本。
+  DD 参数统一使用 Debian 12；DD 后用 cat /etc/debian_version 确认小版本，必要时 apt update && apt full-upgrade。
 
 目标架构:
   ${ARCH}

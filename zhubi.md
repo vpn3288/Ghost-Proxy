@@ -1,5 +1,20 @@
 # Ghost-Proxy 审核记录
 
+# v6.82 版本 (2026-05-21)
+
+- ✅ 修复 P1：`dd_debian.sh` 的 amd64 参数改为上游支持的 `debian 12`，ARM64 改用可访问的 `Linux_reinstall/InstallNET.sh` 与 `-Debian/-pwd/-port` 参数；继续提示 DD 后核验 `/etc/debian_version`。
+- ✅ 修复 P1：`install_amneziawg_go()` 读取 `GOLANG_VERSION`、`PKG_CONFIG_VERSION`、`LIBMNL_DEV_VERSION`，优先安装固定编译依赖，镜像缺包时回退仓库默认版本。
+- ✅ 修复 P1：`install_amneziawg_dkms.sh` 新增 `ghost-awg-dkms-check.timer`，每小时触发 DKMS 健康检查；保留内核 postinst 自愈。
+- ✅ 修复 P1：落地机新增 `ghost-landing-firewall.service`，在 `docker.service` 后重插 `GHOST_LANDING_INPUT` 到 INPUT 第 1 位，降低 Docker/1Panel 重启后压过 Ghost 端口限制的风险。
+- ✅ 修复 P1/P2：中转健康检查默认首轮立即执行，旧默认 `TRANSIT_HEALTH_INITIAL_DELAY=300` 自动迁移为 0；默认日志级别改为 `info`，仍可在 `/etc/default/ghost-transit-health` 改回 `warn`。
+- ✅ 修复 P1：`show-ghost-nodes` 与安装完成输出默认只展示完整 Base64 和 `substore-mihomo-full.yaml`；高级 Provider、provider-only、静态 AWG JS 改为 `show-ghost-nodes --advanced`。
+- ✅ 修复 P2：删除不存在的架构专属 DKMS 脚本探测，减少一次无意义远程下载失败。
+- ⚖️ 评判：继续拒绝新增本机 HTTP/静态文件订阅服务，红线是“禁止 HTTP 订阅”；Sub-Store 只保留本地文件/Base64/复制粘贴入口。
+- ⚖️ 评判：`versions.conf` 预编译 URL/SHA256 仍留空；仓库尚无真实 Release 资产，不能写示例 URL 或伪 SHA。
+- ⚖️ 评判：暂不默认改写节点名加入落地机后缀，避免破坏现有 `主轨-UDP极速`/`备轨-TCP稳定` 导入习惯；多落地聚合应放在中转聚合命令单独实现。
+- ✅ 新增 `install_landing_v6.82.sh`、`install_transit_v6.82.sh`、`install_amneziawg_dkms_v6.82.sh`，稳定入口同步到 v6.82。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.82.sh`、`install_transit_v6.82.sh`、`install_amneziawg_dkms_v6.82.sh` 均通过；`dd_debian.sh --arch amd64/arm64` 纯打印模式通过。
+
 # v6.81 版本 (2026-05-21)
 
 - ✅ 修复 P1：Sub-Store 用户入口改为优先提示 `substore-mihomo-full.yaml`（完整 Mihomo 模板，策略组只引用主轨/备轨）；`substore-awg-for-mihomo.yaml` 保留为高级聚合 Provider，并明确如客户端不尊重 `hidden` 需过滤 `AWG-Tunnel`。
