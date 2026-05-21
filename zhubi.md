@@ -1,5 +1,18 @@
 # Ghost-Proxy 审核记录
 
+# v6.81 版本 (2026-05-21)
+
+- ✅ 修复 P1：Sub-Store 用户入口改为优先提示 `substore-mihomo-full.yaml`（完整 Mihomo 模板，策略组只引用主轨/备轨）；`substore-awg-for-mihomo.yaml` 保留为高级聚合 Provider，并明确如客户端不尊重 `hidden` 需过滤 `AWG-Tunnel`。
+- ✅ 修复 P1/P2：`generate_clash_meta_yaml()` 生成后检查 `substore-awg-for-mihomo.yaml` 的 `AWG-Tunnel`、`dialer-proxy` 与 Base64 解码关键字段；`verify_installation.sh` 增加完整 Mihomo 模板策略组不展示 `AWG-Tunnel` 检查，并在本机存在 `mihomo` 时做软解析校验。
+- ✅ 修复 P1：`dd_debian.sh` 默认只打印命令时不再强制要求 SSH 密码，使用 `<SSH密码>` 占位；只有 `--execute` 才必须提供密码。
+- ✅ 修复 P1：中转健康检查新增 `/etc/default/ghost-transit-health` 和 `EnvironmentFile`，`DISABLE_ON_ICMP_FAIL`、`HEALTH_LOG_LEVEL`、`TRANSIT_HEALTH_INITIAL_DELAY` 可持久化。
+- ✅ 修复 P1/P2：落地机和中转机健康检查首轮延迟至少 300 秒，避免安装后立即产生探测或误报；中转摘要补充日志级别调整方法。
+- ✅ 增强：落地机与 DKMS 脚本在非推荐 Debian 12.14 基线时输出统一 DD 辅助命令；中转机检测到宽泛 iptables ACCEPT 时只告警，不引入应用层组件。
+- ✅ 增强：`install_amneziawg_go()` 源码编译临时目录清理不再依赖恢复原始目录成功，原始目录消失时切到 `/` 后按绝对路径清理。
+- ⚖️ 评判：`versions.conf` 预编译 URL/SHA256 仍保持空值，远端尚无真实 Release 产物；拒绝写入示例 URL 或伪 SHA，待 GitHub Actions 发布真实 amd64/arm64 assets 后再回填。
+- ✅ 新增 `install_landing_v6.81.sh`、`install_transit_v6.81.sh`、`install_amneziawg_dkms_v6.81.sh`，稳定入口同步到 v6.81。
+- ✅ 已执行 `bash -n`：`install_landing.sh`、`install_transit.sh`、`install_amneziawg_dkms.sh`、`verify_installation.sh`、`dd_debian.sh`、`install_landing_v6.81.sh`、`install_transit_v6.81.sh`、`install_amneziawg_dkms_v6.81.sh` 均通过；`dd_debian.sh --arch amd64/arm64` 纯打印模式通过。
+
 # v6.80 版本 (2026-05-21)
 
 - ✅ 修复 P1：`substore-awg-for-mihomo.yaml` 改为自洽 Clash Proxies Provider，内含 `hidden: true` 的 `AWG-Tunnel`、主轨和备轨，主轨 `dialer-proxy` 不再悬空；同步生成 Base64 和逐行 JSON。

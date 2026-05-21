@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.80"
+VERSION="6.81"
 
 usage() {
     cat <<EOF
@@ -68,17 +68,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${SSH_PASSWORD}" ]]; then
-    if [[ -t 0 ]]; then
+    if [[ "${EXECUTE}" == "1" && -t 0 ]]; then
         read -r -s -p "请输入 DD 后 root SSH 密码（不回显）: " SSH_PASSWORD
         echo
-    else
+    elif [[ "${EXECUTE}" == "1" ]]; then
         usage
-        die "非交互模式必须提供 --password"
+        die "--execute 模式必须提供 --password"
+    else
+        SSH_PASSWORD="<SSH密码>"
     fi
 fi
 [[ -n "${SSH_PASSWORD}" ]] || die "SSH 密码不能为空"
 [[ "${SSH_PORT}" =~ ^[0-9]+$ && "${SSH_PORT}" -ge 1 && "${SSH_PORT}" -le 65535 ]] || die "SSH 端口无效: ${SSH_PORT}"
-if [[ "${SSH_PASSWORD}" =~ [\'\"\`\$\\\;\&\|\<\>\(\)] ]]; then
+if [[ "${SSH_PASSWORD}" != "<SSH密码>" && "${SSH_PASSWORD}" =~ [\'\"\`\$\\\;\&\|\<\>\(\)] ]]; then
     die "SSH 密码包含不适合嵌入 DD 命令的字符，请换用字母、数字和常见安全标点"
 fi
 

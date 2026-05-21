@@ -157,6 +157,18 @@ verify_landing() {
                 substore_full_ok=0
             fi
         done
+        if awk '/^proxy-groups:/,/^rules:/' /etc/landing-ghost/substore-mihomo-full.yaml | grep -Fq 'AWG-Tunnel'; then
+            fail "Sub-Store 完整 Mihomo 模板策略组不应直接展示 AWG-Tunnel"
+            substore_full_ok=0
+        fi
+        if command -v mihomo >/dev/null 2>&1; then
+            if mihomo -t -f /etc/landing-ghost/substore-mihomo-full.yaml >/dev/null 2>&1; then
+                ok "mihomo 可解析 Sub-Store 完整 Mihomo 模板"
+            else
+                fail "mihomo 无法解析 Sub-Store 完整 Mihomo 模板"
+                substore_full_ok=0
+            fi
+        fi
         [[ "${substore_full_ok}" -eq 0 ]] || ok "Sub-Store 完整 Mihomo 模板完整"
     else
         fail "Sub-Store 完整 Mihomo 模板缺失: /etc/landing-ghost/substore-mihomo-full.yaml"
