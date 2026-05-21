@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_transit_v6.90.sh — 中转机安装脚本
-# 版本: v6.90 (2026-05-22)
-# v6.90 - 同步稳定版本号；继续保持纯 nftables 转发。
+# install_transit_v6.91.sh — 中转机安装脚本
+# 版本: v6.91 (2026-05-22)
+# v6.91 - 仓库清理版本；继续保持纯 nftables 转发。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 版本号
-VERSION="6.90"
+VERSION="6.91"
 SCRIPT_NAME="install_transit_v${VERSION}.sh"
 CONFIG_DIR="/etc/ghost-transit"
 CONFIG_FILE="${CONFIG_DIR}/config.json"

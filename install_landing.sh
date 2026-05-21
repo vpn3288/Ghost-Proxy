@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install_landing_v6.90.sh — 落地机安装脚本
-# 版本: v6.90 (2026-05-22)
-# v6.90 - 增加 Sub-Store 端到端验证入口、预编译 AWG ref 校验和导入提示收敛。
+# install_landing_v6.91.sh — 落地机安装脚本
+# 版本: v6.91 (2026-05-22)
+# v6.91 - 仓库清理版本：保留当前快照，历史脚本从仓库移除。
 # 完整历史记录请查看 zhubi.md 或 Git 提交历史。
 
 # ==========================================
 # 全局变量
 # ==========================================
-VERSION="6.90"
+VERSION="6.91"
 AWG_BACKEND=""  # 记录 AWG 后端类型：kernel/go/none
 SERVICES_STOPPED_FOR_REINSTALL=0
 DEFAULT_DKMS_VERSION="3.0.10-8+deb12u1"

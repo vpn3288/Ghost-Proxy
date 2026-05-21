@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="6.86"
+VERSION="6.91"
 MODULE_NAME="amneziawg"
 DEFAULT_REPO_URL="https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git"
 # AmneziaWG upstream source refs pinned on 2026-05-20 for reproducible builds.
@@ -125,7 +125,7 @@ detect_platform() {
     os_pretty=$(awk -F= '$1=="PRETTY_NAME" {gsub(/"/, "", $2); print $2; exit}' /etc/os-release)
     if [[ "${os_id:-}" != "debian" || "${os_version_id:-}" != "${RECOMMENDED_OS_VERSION}" ]]; then
         warn "检测到 ${os_pretty:-unknown}，Ghost-Proxy DKMS 仅推荐 Debian ${RECOMMENDED_OS_VERSION}"
-        warn "推荐基线：Debian ${RECOMMENDED_OS_POINT} Bookworm minimal，可显著降低 DKMS 排障成本"
+        warn "推荐排障基线：Debian ${RECOMMENDED_OS_POINT} Bookworm minimal；DD 辅助命令只固定 Debian ${RECOMMENDED_OS_VERSION}，不保证固定小版本"
         warn "官方 ISO: https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/"
         warn "网络安装: https://www.debian.org/distrib/netinst"
         print_dd_baseline_hint
@@ -133,7 +133,7 @@ detect_platform() {
         local debian_point
         debian_point=$(cat /etc/debian_version)
         if [[ "${debian_point}" != "${RECOMMENDED_OS_POINT}" ]]; then
-            warn "当前 Debian ${debian_point}，推荐基线为 ${RECOMMENDED_OS_POINT}；如遇 DKMS 问题，建议 DD 到固定基线"
+            warn "当前 Debian ${debian_point}，已验证排障基线为 ${RECOMMENDED_OS_POINT}；如遇 DKMS 问题，DD 后必须确认 cat /etc/debian_version && uname -r"
             print_dd_baseline_hint
         fi
     fi
@@ -601,8 +601,20 @@ set -u
 
 module_name="${MODULE_NAME:-amneziawg}"
 ref_state="/var/lib/amneziawg-dkms/ref"
+backend_state="/etc/landing-ghost/.awg_backend"
 ref="$(cat "${ref_state}" 2>/dev/null || true)"
 kver="$(uname -r)"
+
+if [[ -r "${backend_state}" ]] && [[ "$(tr -d '[:space:]' < "${backend_state}" 2>/dev/null || true)" == "go" ]]; then
+    echo "SKIP: landing uses amneziawg-go backend; DKMS health check is not needed" >&2
+    exit 0
+fi
+
+if command -v systemctl >/dev/null 2>&1 \
+    && systemctl show awg-landing.service -p Environment 2>/dev/null | grep -qF 'amneziawg-go'; then
+    echo "SKIP: awg-landing.service uses amneziawg-go backend; DKMS health check is not needed" >&2
+    exit 0
+fi
 
 if modprobe "${module_name}" 2>/dev/null && [[ -n "${ref}" ]] && grep -qx "${ref}" "${ref_state}" 2>/dev/null; then
     exit 0
